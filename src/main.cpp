@@ -87,7 +87,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (!apiKey.has_value()) {
-        std::optional<std::string> apiKey = config["api_key"].value<std::string>();
+        apiKey = config["api_key"].value<std::string>();
     }
     if (!apiKey.has_value()) {
         std::cerr << "Please provide your N2YO API key." << std::endl;
