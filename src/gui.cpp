@@ -1,4 +1,6 @@
-#include <sattrack/gui.h>
+#include <sattrack/gui.hpp>
+
+namespace sattrack {
 
 class SatTrackWindow : public Gtk::Window {
 public:
@@ -25,4 +27,6 @@ int startGUI(int argc, char* argv[]) {
     SatTrackWindow window;
 
     return app->run(window);
+}
+
 }
