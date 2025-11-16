@@ -52,12 +52,13 @@ toml::table createDefaultConfig(const std::string &configPath) {
 int main(int argc, char* argv[]) {
 
     std::string configFile = "~/.sattrack.toml";
+    std::optional<std::string> apiKey;
 
     CLI::App app{"SatTrack"};
     argv = app.ensure_utf8(argv);
 
-    std::string filename = "default";
     app.add_option("-c,--config", configFile, "Read configuration from this file (default: " + configFile + ").");
+    app.add_option("-k,--key", apiKey, "N2YO API key");
 
     CLI11_PARSE(app, argc, argv);
 
@@ -85,7 +86,24 @@ int main(int argc, char* argv[]) {
         config = createDefaultConfig(configFile);
     }
 
+    if (!apiKey.has_value()) {
+        std::optional<std::string> apiKey = config["api_key"].value<std::string>();
+    }
+    if (!apiKey.has_value()) {
+        std::cerr << "Please provide your N2YO API key." << std::endl;
+        return 1;
+    }
 
-    return sattrack::startGUI(argc, argv);
+    try {
+        std::string tle = sattrack::getTLE(apiKey.value(), 25544);
+        std::cout << "TLE:" << std::endl;
+        std::cout << tle << std::endl;
+    } catch (const std::exception &err) {
+        std::cerr << err.what() << std::endl;
+        return 1;
+    }
 
+    //return sattrack::startGUI(argc, argv);
+
+    return 0;
 }
