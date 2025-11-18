@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
 project(SatTrack VERSION 1.0.0 LANGUAGES CXX)
 
-# Set C++17 standard
-set(CMAKE_CXX_STANDARD 17)
+# Set C++20 standard
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -61,17 +61,6 @@ if(NOT CLI11_INCLUDE_DIR)
     message(FATAL_ERROR "CLI11 not found. Please install libcli11-dev")
 endif()
 
-# TOML++ (header-only library)
-find_path(TOMLPLUSPLUS_INCLUDE_DIR "toml++/toml.hpp"
-    PATHS
-        /usr/include
-        /usr/local/include
-)
-
-if(NOT TOMLPLUSPLUS_INCLUDE_DIR)
-    message(FATAL_ERROR "TOML++ not found. Please install libtomlplusplus-dev")
-endif()
-
 # Include directories
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
@@ -80,7 +69,6 @@ include_directories(
     ${RAPIDJSON_INCLUDE_DIRS}
     ${CURLPP_INCLUDE_DIRS}
     ${CLI11_INCLUDE_DIR}
-    ${TOMLPLUSPLUS_INCLUDE_DIR}
 )
 
 # Link directories
@@ -93,6 +81,7 @@ set(SOURCES
     src/main.cpp
     src/gui.cpp
     src/n2yo.cpp
+    src/config.cpp
     # Add more source files here as you create them
 )
 
@@ -134,5 +123,4 @@ message(STATUS "  libcurl: ${CURL_VERSION_STRING}")
 message(STATUS "  RapidJSON: ${RAPIDJSON_INCLUDE_DIRS}")
 message(STATUS "  curlpp: ${CURLPP_LIBRARIES}")
 message(STATUS "  CLI11: ${CLI11_INCLUDE_DIR}")
-message(STATUS "  TOML++: ${TOMLPLUSPLUS_INCLUDE_DIR}")
 message(STATUS "")

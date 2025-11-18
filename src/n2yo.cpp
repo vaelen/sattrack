@@ -6,18 +6,12 @@
 #include <sstream>
 #include <stdexcept>
 
-namespace sattrack {
+namespace n2yo {
 
-std::string getTLE(const std::string& apiKey, int noradId) {
+rapidjson::Document doGet(std::string url) {
     // Initialize curlpp
     curlpp::Cleanup cleaner;
     curlpp::Easy request;
-
-    // Build the API URL
-    std::ostringstream urlBuilder;
-    urlBuilder << "https://api.n2yo.com/rest/v1/satellite/tle/"
-               << noradId << "&apiKey=" << apiKey;
-    std::string url = urlBuilder.str();
 
     // Set up the request
     request.setOpt(new curlpp::options::Url(url));
@@ -56,12 +50,34 @@ std::string getTLE(const std::string& apiKey, int noradId) {
         throw std::runtime_error(errorMsg);
     }
 
+    return doc;
+}
+
+TLEResponse getTLE(const std::string &apiKey, int noradId) {
+    // Build the API URL
+    std::ostringstream urlBuilder;
+    urlBuilder << "https://api.n2yo.com/rest/v1/satellite/tle/"
+               << noradId << "&apiKey=" << apiKey;
+    std::string url = urlBuilder.str();
+
+    auto doc = doGet(url);
+
     // Extract TLE data
     if (!doc.HasMember("tle") || !doc["tle"].IsString()) {
         throw std::runtime_error("Response does not contain TLE data");
     }
 
-    return doc["tle"].GetString();
+    auto info = doc["info"].GetObject();
+
+    TLEResponse response {
+        .info = {
+            .id = info["satid"].GetInt(),
+            .name = info["satname"].GetString()
+        },
+        .tle = doc["tle"].GetString()
+    };
+
+    return response;
 }
 
 } // namespace sattrack
