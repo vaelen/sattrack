@@ -8,6 +8,10 @@
 
 namespace n2yo {
 
+// API Documentation: https://www.n2yo.com/api/
+
+#define BASE_URI "https://api.n2yo.com/rest/v1/satellite/"
+
 rapidjson::Document doGet(std::string url) {
     // Initialize curlpp
     curlpp::Cleanup cleaner;
@@ -56,7 +60,7 @@ rapidjson::Document doGet(std::string url) {
 TLEResponse getTLE(const std::string &apiKey, int noradId) {
     // Build the API URL
     std::ostringstream urlBuilder;
-    urlBuilder << "https://api.n2yo.com/rest/v1/satellite/tle/"
+    urlBuilder << BASE_URI << "tle/"
                << noradId << "&apiKey=" << apiKey;
     std::string url = urlBuilder.str();
 
