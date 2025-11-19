@@ -34,6 +34,14 @@ void Config::setLongitude(const double l) {
     longitude = l;
 }
 
+double Config::getAltitude() {
+    return altitude;
+}
+
+void Config::setAltitude(const double a) {
+    altitude = a;
+}
+
 void Config::addSatellite(const int noradID) {
     satellites.insert(noradID);
 }
@@ -68,6 +76,54 @@ std::set<int> Config::getSatellites() {
 
 bool Config::hasSatellites() {
     return !satellites.empty();
+}
+
+int Config::getDays() {
+    if (days > 0 && days <= 10) {
+        return days;
+    }
+    if (days > 10) {
+        return 10;
+    }
+    return 1;
+}
+
+void Config::setDays(const int d) {
+    if (d > 0 && d <= 10) {
+        days = d;
+    } else if (d > 10) {
+        days = 10;
+    } else {
+        days = 1;
+    }
+}
+
+int Config::getMinimumElevation() {
+    if (minimumElevation >= 0 && minimumElevation <= 90) {
+        return minimumElevation;
+    }
+    if (minimumElevation > 90) {
+        return 90;
+    }
+    return 0;
+}
+
+void Config::setMinimumElevation(const int degrees) {
+    if (degrees >=0 && degrees <= 90) {
+        minimumElevation = degrees;
+    } else if (degrees > 90) {
+        minimumElevation = 90;
+    } else {
+        minimumElevation = 0;
+    }
+}
+
+bool Config::getVerbose() {
+    return verbose;
+}
+
+void Config::setVerbose(bool v) {
+    verbose = v;
 }
 
 }
