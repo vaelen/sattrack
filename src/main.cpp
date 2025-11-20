@@ -2,6 +2,8 @@
 #include <CLI/CLI.hpp>
 #include <filesystem>
 #include <fstream>
+#include <format>
+#include <chrono>
 
 namespace fs = std::filesystem;
 
@@ -15,6 +17,86 @@ std::string expandTilde(const std::string &path) {
     }
     return path;
 }
+
+std::string formatTimestamp(const long timestamp) {
+    auto timePoint = std::chrono::system_clock::time_point(
+        std::chrono::seconds(timestamp)
+    );
+    // Explicitly truncate to seconds
+    auto truncated = std::chrono::floor<std::chrono::seconds>(timePoint);
+    auto localTime = std::chrono::zoned_time{
+        std::chrono::current_zone(), truncated
+    };
+    return std::format("{:%F %T %Z}", localTime);
+}
+
+std::chrono::zoned_seconds toLocalTime(const long timestamp) {
+    auto timePoint = std::chrono::system_clock::time_point(
+        std::chrono::seconds(timestamp)
+    );
+    // Explicitly truncate to seconds
+    auto truncated = std::chrono::floor<std::chrono::seconds>(timePoint);
+    return std::chrono::zoned_time{
+        std::chrono::current_zone(), truncated
+    };
+}
+
+void printPasses(sattrack::Config &config) {
+    try {
+        constexpr std::string_view rowFormat = "{:^25} {:^25} {:^14} {:^18} {:^12} {:^12} {:^12} {:^10}";
+        constexpr std::string_view timeFormat = "{:%F %T %Z}";
+        constexpr std::string_view durationFormat = "{:>6%Q %q} {:>4%Q %q}";
+        constexpr std::string_view etaFormat = "{:>4%Q %q} {:>6%Q %q} {:>4%Q %q}";
+        constexpr std::string_view azFormat = "{:>6.2f} {:<3}";
+        constexpr std::string_view elFormat = "{:<5.2f}";
+
+        std::string sep25(25, '-');
+        std::string sep18(18, '-');
+        std::string sep15(15, '-');
+        std::string sep14(14, '-');
+        std::string sep12(12, '-');
+        std::string sep10(10, '-');
+
+        for (auto noradID : config.getSatellites()) {
+            auto response = n2yo::getRadioPasses(config.getAPIKey(),
+                noradID, config.getLatitude(), config.getLongitude(), config.getAltitude(),
+                config.getDays(), config.getMinimumElevation(), config.getVerbose());
+            std::cout << "Upcoming Passes for " << response.info.name << " (" << noradID << "):" << std::endl;
+            std::cout << std::format(rowFormat, "Start", "End", "Duration", "Starts In", "Start Az", "End Az", "Max Az", "Max Elev") << std::endl;
+            std::cout << std::format(rowFormat, sep25, sep25, sep14, sep18, sep12, sep12, sep12, sep10) << std::endl;
+            for (auto pass: response.passes) {
+                // Calculate all our times and durations
+                auto startTime = toLocalTime(pass.startUTC);
+                auto endTime = toLocalTime(pass.endUTC);
+                auto duration = std::chrono::seconds(pass.endUTC - pass.startUTC);
+                auto durationMins = std::chrono::duration_cast<std::chrono::minutes>(duration);
+                auto durationSecs = std::chrono::duration_cast<std::chrono::seconds>(duration % std::chrono::minutes(1));
+                auto now = std::chrono::system_clock::now();
+                auto nowSeconds = duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
+                auto eta = std::chrono::seconds(pass.startUTC - nowSeconds);
+                auto etaHours = std::chrono::duration_cast<std::chrono::hours>(eta);
+                auto etaMins = std::chrono::duration_cast<std::chrono::minutes>(eta % std::chrono::hours(1));
+                auto etaSecs = std::chrono::duration_cast<std::chrono::seconds>(eta % std::chrono::minutes(1));
+
+                // Output the pass data
+                std::cout << std::format(rowFormat, 
+                    std::format(timeFormat, startTime),
+                    std::format(timeFormat, endTime),
+                    std::format(durationFormat, durationMins, durationSecs),
+                    std::format(etaFormat, etaHours, etaMins, etaSecs),
+                    std::format(azFormat, pass.startAz, pass.startAzCompass),
+                    std::format(azFormat, pass.endAz, pass.endAzCompass),
+                    std::format(azFormat, pass.maxAz, pass.maxAzCompass),
+                    std::format(elFormat, pass.maxEl)) << std::endl;
+            }
+            std::cout << std::endl;
+        }
+    } catch (const std::exception &err) {
+        std::cerr << err.what() << std::endl;
+        std::exit(1);
+    }
+}
+
 
 /** Program entry point */
 int main(int argc, char* argv[]) {
@@ -108,28 +190,7 @@ int main(int argc, char* argv[]) {
     });
 
     passesCommand->final_callback([&config](void) {
-        try {
-            for (auto noradID : config.getSatellites()) {
-                auto response = n2yo::getRadioPasses(config.getAPIKey(), 
-                    noradID, config.getLatitude(), config.getLongitude(), config.getAltitude(), 
-                    config.getDays(), config.getMinimumElevation(), config.getVerbose());
-                std::cout << "Upcoming Passes for " << response.info.name << " (" << noradID << "):" << std::endl;
-                std::cout << "\tStart (UTC)\tEnd (UTC)\tStart Azimuth\tEnd Azimuth\tMax Azimuth\tMax Elevation" << std::endl;
-                for (auto pass: response.passes) {
-                    std::cout << '\t' << pass.startUTC;
-                    std::cout << '\t' << pass.endUTC;
-                    std::cout << '\t' << pass.startAz << "(" << pass.startAzCompass << ")";
-                    std::cout << '\t' << pass.endAz << "(" << pass.endAzCompass << ")";
-                    std::cout << '\t' << pass.maxAz << "(" << pass.maxAzCompass << ")";
-                    std::cout << '\t' << pass.maxEl;
-                    std::cout << std::endl;
-                }
-                std::cout << std::endl;
-            }
-        } catch (const std::exception &err) {
-            std::cerr << err.what() << std::endl;
-            std::exit(1);
-        }
+        printPasses(config);
     });
 
     CLI11_PARSE(app, argc, argv);
