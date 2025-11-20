@@ -4,6 +4,7 @@
 #include <fstream>
 #include <format>
 #include <chrono>
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -115,12 +116,12 @@ int main(int argc, char* argv[]) {
 
     app.set_config("--config", configFile, "Read configuration from this file (default: " + configFile + ").");
 
+    std::vector<int> ids;
+
     app.add_option_function<std::string>("--key",
         [&config](const std::string &key) { config.setAPIKey(key); },
         "N2YO API key");
-    app.add_option_function<int>("--id", 
-        [&config](const int id) { config.addSatellite(id); },
-        "Norad ID of satellite to track (can be listed more than once)");
+    app.add_option("--id", ids, "Norad ID of satellite to track (can be listed more than once)");
     app.add_option_function<double>("--lat", 
         [&config](const double l) { config.setLatitude(l); },
         "The latitude of the ground station (in decimal format)");
@@ -163,10 +164,14 @@ int main(int argc, char* argv[]) {
         "Minimum pass elevation above the horizon in degrees (default 10, max 90)");
 
     app.parse_complete_callback(
-        [&config](void) {
+        [&config, &ids](void) {
             if (!config.hasAPIKey()) {
                 std::cerr << "Please provide your N2YO API key." << std::endl;
                 std::exit(1);
+            }
+
+            for (auto id: ids) {
+                config.addSatellite(id);
             }
 
             if (!config.hasSatellites()) {
