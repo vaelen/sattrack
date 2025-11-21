@@ -27,7 +27,7 @@ I used Claude Code to help speed up my implementation of SatTrack by helping me 
 
 ## Data sources
 
-SatTrack get both TLE and pass data for the satellites it is tracking from [N2YO](https://www.n2yo.com). You will need an API key to use the application, which you can get by signing up for a free account at N2YO.
+SatTrack gets both TLE and pass data for the satellites it is tracking from [N2YO](https://www.n2yo.com). You will need an API key to use the application, which you can get by signing up for a free account at N2YO.
 
 I was originally going to implement my own pass calculator, but I haven't done that yet since this is just a small toy project at the moment. I'll try to do it later on though.
 
