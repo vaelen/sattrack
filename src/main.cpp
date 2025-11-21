@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2025 Andrew C. Young <andrew@vaelen.org>
+ * SPDX-License-Identifier: MIT
+ */
+
 #include <sattrack.hpp>
 #include <CLI/CLI.hpp>
 #include <filesystem>
@@ -5,6 +10,7 @@
 #include <format>
 #include <chrono>
 #include <vector>
+#include <algorithm>
 
 namespace fs = std::filesystem;
 
@@ -44,7 +50,8 @@ std::chrono::zoned_seconds toLocalTime(const long timestamp) {
 
 void printPasses(sattrack::Config &config) {
     try {
-        constexpr std::string_view rowFormat = "{:^25} {:^25} {:^14} {:^18} {:^12} {:^12} {:^12} {:^10}";
+        constexpr std::string_view rowFormat = "{:^25} {:^25} {:^25} {:^14} {:^18} {:^12} {:^12} {:^12} {:^10}";
+        constexpr std::string_view satFormat = " {:<5} {:<17}";
         constexpr std::string_view timeFormat = "{:%F %T %Z}";
         constexpr std::string_view durationFormat = "{:>6%Q %q} {:>4%Q %q}";
         constexpr std::string_view etaFormat = "{:>4%Q %q} {:>6%Q %q} {:>4%Q %q}";
@@ -58,40 +65,63 @@ void printPasses(sattrack::Config &config) {
         std::string sep12(12, '-');
         std::string sep10(10, '-');
 
+        struct RadioPassWrapper {
+            n2yo::SatelliteInfo info;
+            n2yo::RadioPass pass;
+        };
+
+        std::vector<RadioPassWrapper> passes;
+
+        std::cout << "Loading Passes..." << std::flush;
         for (auto noradID : config.getSatellites()) {
             auto response = n2yo::getRadioPasses(config.getAPIKey(),
                 noradID, config.getLatitude(), config.getLongitude(), config.getAltitude(),
                 config.getDays(), config.getMinimumElevation(), config.getVerbose());
-            std::cout << "Upcoming Passes for " << response.info.name << " (" << noradID << "):" << std::endl;
-            std::cout << std::format(rowFormat, "Start", "End", "Duration", "Starts In", "Start Az", "End Az", "Max Az", "Max Elev") << std::endl;
-            std::cout << std::format(rowFormat, sep25, sep25, sep14, sep18, sep12, sep12, sep12, sep10) << std::endl;
             for (auto pass: response.passes) {
-                // Calculate all our times and durations
-                auto startTime = toLocalTime(pass.startUTC);
-                auto endTime = toLocalTime(pass.endUTC);
-                auto duration = std::chrono::seconds(pass.endUTC - pass.startUTC);
-                auto durationMins = std::chrono::duration_cast<std::chrono::minutes>(duration);
-                auto durationSecs = std::chrono::duration_cast<std::chrono::seconds>(duration % std::chrono::minutes(1));
-                auto now = std::chrono::system_clock::now();
-                auto nowSeconds = duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
-                auto eta = std::chrono::seconds(pass.startUTC - nowSeconds);
-                auto etaHours = std::chrono::duration_cast<std::chrono::hours>(eta);
-                auto etaMins = std::chrono::duration_cast<std::chrono::minutes>(eta % std::chrono::hours(1));
-                auto etaSecs = std::chrono::duration_cast<std::chrono::seconds>(eta % std::chrono::minutes(1));
-
-                // Output the pass data
-                std::cout << std::format(rowFormat, 
-                    std::format(timeFormat, startTime),
-                    std::format(timeFormat, endTime),
-                    std::format(durationFormat, durationMins, durationSecs),
-                    std::format(etaFormat, etaHours, etaMins, etaSecs),
-                    std::format(azFormat, pass.startAz, pass.startAzCompass),
-                    std::format(azFormat, pass.endAz, pass.endAzCompass),
-                    std::format(azFormat, pass.maxAz, pass.maxAzCompass),
-                    std::format(elFormat, pass.maxEl)) << std::endl;
+                passes.emplace_back(response.info, pass);
             }
-            std::cout << std::endl;
+            std::cout << "." << std::flush;
         }
+        std::cout << " Done." << std::endl << std::endl << std::flush;
+
+        // Sort by startUTC (ascending)
+        auto comparator = [](const RadioPassWrapper& a, const RadioPassWrapper& b) {
+            return a.pass.startUTC < b.pass.startUTC;
+        };
+        std::sort(passes.begin(), passes.end(), comparator);
+
+        std::cout << "Upcoming Passes:" << std::endl;
+        std::cout << std::format(rowFormat, "Satellite", "Start", "End", "Duration", "Starts In", "Start Az", "End Az", "Max Az", "Max Elev") << std::endl;
+        std::cout << std::format(rowFormat, sep25, sep25, sep25, sep14, sep18, sep12, sep12, sep12, sep10) << std::endl;
+        for (auto wrapper: passes) {
+            auto info = wrapper.info;
+            auto pass = wrapper.pass;
+            // Calculate all our times and durations
+            auto startTime = toLocalTime(pass.startUTC);
+            auto endTime = toLocalTime(pass.endUTC);
+            auto duration = std::chrono::seconds(pass.endUTC - pass.startUTC);
+            auto durationMins = std::chrono::duration_cast<std::chrono::minutes>(duration);
+            auto durationSecs = std::chrono::duration_cast<std::chrono::seconds>(duration % std::chrono::minutes(1));
+            auto now = std::chrono::system_clock::now();
+            auto nowSeconds = duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
+            auto eta = std::chrono::seconds(pass.startUTC - nowSeconds);
+            auto etaHours = std::chrono::duration_cast<std::chrono::hours>(eta);
+            auto etaMins = std::chrono::duration_cast<std::chrono::minutes>(eta % std::chrono::hours(1));
+            auto etaSecs = std::chrono::duration_cast<std::chrono::seconds>(eta % std::chrono::minutes(1));
+
+            // Output the pass data
+            std::cout << std::format(rowFormat, 
+                std::format(satFormat, info.id, info.name),
+                std::format(timeFormat, startTime),
+                std::format(timeFormat, endTime),
+                std::format(durationFormat, durationMins, durationSecs),
+                std::format(etaFormat, etaHours, etaMins, etaSecs),
+                std::format(azFormat, pass.startAz, pass.startAzCompass),
+                std::format(azFormat, pass.endAz, pass.endAzCompass),
+                std::format(azFormat, pass.maxAz, pass.maxAzCompass),
+                std::format(elFormat, pass.maxEl)) << std::endl;
+        }
+        std::cout << std::endl;
     } catch (const std::exception &err) {
         std::cerr << err.what() << std::endl;
         std::exit(1);

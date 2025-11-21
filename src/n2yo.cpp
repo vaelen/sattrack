@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2025 Andrew C. Young <andrew@vaelen.org>
+ * SPDX-License-Identifier: MIT
+ */
+
 #include <sattrack/n2yo.hpp>
 #include <curlpp/cURLpp.hpp>
 #include <curlpp/Easy.hpp>

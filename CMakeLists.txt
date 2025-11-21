@@ -14,9 +14,6 @@ endif()
 # Find required packages
 find_package(PkgConfig REQUIRED)
 
-# Find GTKmm
-pkg_check_modules(GTKMM REQUIRED gtkmm-3.0)
-
 # Find libcurl
 find_package(CURL REQUIRED)
 
@@ -64,22 +61,15 @@ endif()
 # Include directories
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
-    ${GTKMM_INCLUDE_DIRS}
     ${CURL_INCLUDE_DIRS}
     ${RAPIDJSON_INCLUDE_DIRS}
     ${CURLPP_INCLUDE_DIRS}
     ${CLI11_INCLUDE_DIR}
 )
 
-# Link directories
-link_directories(
-    ${GTKMM_LIBRARY_DIRS}
-)
-
 # Source files
 set(SOURCES
     src/main.cpp
-    src/gui.cpp
     src/n2yo.cpp
     src/config.cpp
     # Add more source files here as you create them
@@ -90,14 +80,8 @@ add_executable(sattrack ${SOURCES})
 
 # Link libraries
 target_link_libraries(sattrack
-    ${GTKMM_LIBRARIES}
     ${CURL_LIBRARIES}
     ${CURLPP_LIBRARIES}
-)
-
-# Compiler options
-target_compile_options(sattrack PRIVATE
-    ${GTKMM_CFLAGS_OTHER}
 )
 
 # Install targets
@@ -118,7 +102,6 @@ message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Install Prefix: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "")
 message(STATUS "Dependencies:")
-message(STATUS "  GTKmm: ${GTKMM_VERSION}")
 message(STATUS "  libcurl: ${CURL_VERSION_STRING}")
 message(STATUS "  RapidJSON: ${RAPIDJSON_INCLUDE_DIRS}")
 message(STATUS "  curlpp: ${CURLPP_LIBRARIES}")
