@@ -171,5 +171,6 @@ double Orbit::getMeanMotion() const {
 
 int Orbit::getRevolutionNumberAtEpoch() const {
     return revolutionNumberAtEpoch;
+}
 
 } // namespace sattrack
