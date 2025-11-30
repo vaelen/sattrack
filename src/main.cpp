@@ -247,7 +247,7 @@ int main(int argc, char* argv[]) {
                 std::cout << "  Bstar Drag Term: " << orbit.getBstarDragTerm() << std::endl;
                 std::cout << "  Element Set Number: " << orbit.getElementSetNumber() << std::endl;
                 std::cout << "  Inclination: " << orbit.getInclination() << " deg" << std::endl;
-                std::cout << "  Right Ascension of Ascending Node: " << orbit.getRAAN() << " deg" << std::endl;
+                std::cout << "  Right Ascension of Ascending Node: " << orbit.getRightAscensionOfAscendingNode() << " deg" << std::endl;
                 std::cout << "  Eccentricity: " << orbit.getEccentricity() << std::endl;
                 std::cout << "  Argument of Perigee: " << orbit.getArgumentOfPerigee() << " deg" << std::endl;
                 std::cout << "  Mean Anomaly: " << orbit.getMeanAnomaly() << " deg" << std::endl;

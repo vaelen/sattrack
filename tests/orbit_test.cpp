@@ -88,7 +88,7 @@ TEST_F(OrbitTest, ParseISSLine2_Inclination) {
 
 TEST_F(OrbitTest, ParseISSLine2_RAAN) {
     orbit.updateFromTLE(ISS_TLE);
-    EXPECT_DOUBLE_EQ(orbit.getRAAN(), 206.3646);
+    EXPECT_DOUBLE_EQ(orbit.getRightAscensionOfAscendingNode(), 206.3646);
 }
 
 TEST_F(OrbitTest, ParseISSLine2_Eccentricity) {
@@ -187,7 +187,7 @@ TEST_F(OrbitTest, EccentricityRange) {
 
 TEST_F(OrbitTest, RAANRange) {
     orbit.updateFromTLE(ISS_TLE);
-    double raan = orbit.getRAAN();
+    double raan = orbit.getRightAscensionOfAscendingNode();
     EXPECT_GE(raan, 0.0);
     EXPECT_LT(raan, 360.0);
 }

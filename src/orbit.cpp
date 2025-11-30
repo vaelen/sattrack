@@ -27,7 +27,7 @@ constexpr double GMST_T3_DIVISOR = 38710000.0;  // Cubic correction divisor (T³
 
 // Degree-radian conversion factors
 constexpr double DEGREES_TO_RADIANS = std::numbers::pi / 180.0;
-constexpr double RADIANS_TO_DEGREES = 180.0 / std::numbers::pi;
+// constexpr double RADIANS_TO_DEGREES = 180.0 / std::numbers::pi;
 
 // Helper function to trim leading spaces from a string_view
 std::string_view trimLeft(const std::string_view &str) {
@@ -60,10 +60,10 @@ inline double fromExponentialString(const std::string_view &str) {
         }
     }
 
-    std::string_view baseView = "0." + std::string(str.substr(0, pos));
+    std::string baseStr = "0." + std::string(str.substr(0, pos));
     std::string_view exponentView = str.substr(pos + 1);
 
-    double base = toNumber<double>(baseView);;
+    double base = toNumber<double>(baseStr);
     int exponent = toNumber<int>(exponentView);
     double value = base * std::pow(10.0, isNegative ? -exponent : exponent);
     return value;
@@ -93,7 +93,7 @@ auto parseEpoch(const std::string_view &epochStr) {
 }
 
 // Convert a time_point to Julian Date
-double toJulianDate(std::chrono::system_clock::time_point tp) {
+double toJulianDate(time_point tp) {
     using namespace std::chrono;
     
     auto daysSinceEpoch = duration_cast<duration<double, days::period>>(
@@ -245,7 +245,7 @@ Vec3 Orbit::getECI(double trueAnomalyInRadians) const {
     // Get remaining values from orbital elements
     e = eccentricity;
     i = inclination * DEGREES_TO_RADIANS;
-    raan = raan * DEGREES_TO_RADIANS;
+    raan = rightAscensionOfAscendingNode * DEGREES_TO_RADIANS;
     omega = argumentOfPerigee * DEGREES_TO_RADIANS;
     nu = trueAnomalyInRadians;
 
@@ -306,7 +306,7 @@ void Orbit::updateFromTLE(const std::string_view &tle) {
             // Inclination is columns 9-16
             inclination = toNumber<double>(trimLeft(lineView.substr(8, 8)));
             // RAAN is columns 18-25
-            raan = toNumber<double>(trimLeft(lineView.substr(17, 8)));
+            rightAscensionOfAscendingNode = toNumber<double>(trimLeft(lineView.substr(17, 8)));
             // Eccentricity is columns 27-33 (decimal implied)
             eccentricity = toNumber<double>("0." + std::string(trimLeft(lineView.substr(26, 7))));
             // Argument of perigee is columns 35-42
@@ -361,8 +361,8 @@ double Orbit::getInclination() const {
     return inclination;
 }
 
-double Orbit::getRAAN() const {
-    return raan;
+double Orbit::getRightAscensionOfAscendingNode() const {
+    return rightAscensionOfAscendingNode;
 }
 
 double Orbit::getEccentricity() const {

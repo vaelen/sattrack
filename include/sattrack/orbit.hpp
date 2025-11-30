@@ -56,7 +56,7 @@ public:
     int getElementSetNumber() const;
 
     double getInclination() const;
-    double getRAAN() const;
+    double getRightAscensionOfAscendingNode() const;
     double getEccentricity() const;
     double getArgumentOfPerigee() const;
     double getMeanAnomaly() const;
@@ -81,13 +81,19 @@ private:
 
 // Second Line - Orbital Elements
     double inclination;
-    double raan;
+    double rightAscensionOfAscendingNode;
     double eccentricity;
     double argumentOfPerigee;
     double meanAnomaly;
     double meanMotion;
     int revolutionNumberAtEpoch;
 };
+
+Geodetic ecefToGeodetic(const Vec3 &ecef);
+double toJulianDate(time_point tp);
+double gmst(double julianDate);
+Vec3 eciToECEF(const Vec3 &eci, double gst);
+Geodetic ecefToGeodetic(const Vec3 &ecef);
 
 }
 
