@@ -233,5 +233,312 @@ TEST_F(OrbitTest, NOAA19IsSunSynchronous) {
     EXPECT_LT(incl, 100.0);
 }
 
+// ============================================================================
+// Vec3 Tests
+// ============================================================================
+
+TEST(Vec3Test, Addition) {
+    Vec3 a{1.0, 2.0, 3.0};
+    Vec3 b{4.0, 5.0, 6.0};
+    Vec3 result = a + b;
+    EXPECT_DOUBLE_EQ(result.x, 5.0);
+    EXPECT_DOUBLE_EQ(result.y, 7.0);
+    EXPECT_DOUBLE_EQ(result.z, 9.0);
+}
+
+TEST(Vec3Test, ScalarMultiplication) {
+    Vec3 v{2.0, 3.0, 4.0};
+    Vec3 result = v * 2.5;
+    EXPECT_DOUBLE_EQ(result.x, 5.0);
+    EXPECT_DOUBLE_EQ(result.y, 7.5);
+    EXPECT_DOUBLE_EQ(result.z, 10.0);
+}
+
+TEST(Vec3Test, Magnitude) {
+    Vec3 v{3.0, 4.0, 0.0};
+    EXPECT_DOUBLE_EQ(v.magnitude(), 5.0);
+}
+
+TEST(Vec3Test, MagnitudeUnitVector) {
+    Vec3 v{1.0, 0.0, 0.0};
+    EXPECT_DOUBLE_EQ(v.magnitude(), 1.0);
+}
+
+TEST(Vec3Test, MagnitudeZeroVector) {
+    Vec3 v{0.0, 0.0, 0.0};
+    EXPECT_DOUBLE_EQ(v.magnitude(), 0.0);
+}
+
+TEST(Vec3Test, Magnitude3D) {
+    // sqrt(1^2 + 2^2 + 2^2) = sqrt(9) = 3
+    Vec3 v{1.0, 2.0, 2.0};
+    EXPECT_DOUBLE_EQ(v.magnitude(), 3.0);
+}
+
+// ============================================================================
+// Julian Date Tests
+// ============================================================================
+
+TEST(JulianDateTest, UnixEpoch) {
+    // Unix epoch (1970-01-01 00:00:00 UTC) should be JD 2440587.5
+    auto unixEpoch = std::chrono::system_clock::from_time_t(0);
+    double jd = toJulianDate(unixEpoch);
+    EXPECT_NEAR(jd, 2440587.5, 1e-6);
+}
+
+TEST(JulianDateTest, J2000Epoch) {
+    // J2000.0 (2000-01-01 12:00:00 TT) is JD 2451545.0
+    // J2000 in UTC is approximately 2000-01-01 11:58:55.816 UTC
+    // For simplicity, test that 2000-01-01 12:00:00 UTC is close
+    std::tm tm = {};
+    tm.tm_year = 100;  // 2000
+    tm.tm_mon = 0;     // January
+    tm.tm_mday = 1;
+    tm.tm_hour = 12;
+    tm.tm_min = 0;
+    tm.tm_sec = 0;
+    auto tp = std::chrono::system_clock::from_time_t(timegm(&tm));
+    double jd = toJulianDate(tp);
+    EXPECT_NEAR(jd, 2451545.0, 0.01);
+}
+
+TEST(JulianDateTest, KnownDate) {
+    // 2024-03-20 00:00:00 UTC is approximately JD 2460389.5
+    std::tm tm = {};
+    tm.tm_year = 124;  // 2024
+    tm.tm_mon = 2;     // March
+    tm.tm_mday = 20;
+    tm.tm_hour = 0;
+    tm.tm_min = 0;
+    tm.tm_sec = 0;
+    auto tp = std::chrono::system_clock::from_time_t(timegm(&tm));
+    double jd = toJulianDate(tp);
+    EXPECT_NEAR(jd, 2460389.5, 0.01);
+}
+
+// ============================================================================
+// GMST Tests
+// ============================================================================
+
+TEST(GMSTTest, ReturnsRadians) {
+    // GMST should be in range [0, 2π)
+    double jd = 2451545.0;  // J2000.0
+    double gst = gmst(jd);
+    EXPECT_GE(gst, 0.0);
+    EXPECT_LT(gst, 2.0 * M_PI);
+}
+
+TEST(GMSTTest, J2000Epoch) {
+    // At J2000.0 (JD 2451545.0), GMST should be approximately 280.46 degrees
+    // which is about 4.894 radians
+    double gst = gmst(2451545.0);
+    double gstDegrees = gst * 180.0 / M_PI;
+    EXPECT_NEAR(gstDegrees, 280.46, 0.1);
+}
+
+TEST(GMSTTest, OneDayLater) {
+    // GMST advances ~360.98 degrees per day (sidereal rate)
+    // But since gmst() normalizes to [0, 360), the difference
+    // between consecutive days is just the fractional part: ~0.98 degrees
+    double gst1 = gmst(2451545.0);
+    double gst2 = gmst(2451546.0);
+
+    double diff = gst2 - gst1;
+    if (diff < 0) diff += 2.0 * M_PI;
+
+    // After normalization, diff should be ~0.98 degrees (the excess over 360)
+    double diffDegrees = diff * 180.0 / M_PI;
+    EXPECT_NEAR(diffDegrees, 0.98564736629, 0.01);
+}
+
+// ============================================================================
+// ECI to ECEF Tests
+// ============================================================================
+
+TEST(ECIToECEFTest, ZeroGST) {
+    // When GST = 0, ECI and ECEF should be aligned
+    Vec3 eci{1000.0, 2000.0, 3000.0};
+    Vec3 ecef = eciToECEF(eci, 0.0);
+    EXPECT_NEAR(ecef.x, eci.x, 1e-10);
+    EXPECT_NEAR(ecef.y, eci.y, 1e-10);
+    EXPECT_NEAR(ecef.z, eci.z, 1e-10);
+}
+
+TEST(ECIToECEFTest, QuarterRotation) {
+    // When GST = π/2, X becomes Y and Y becomes -X
+    Vec3 eci{1000.0, 0.0, 0.0};
+    Vec3 ecef = eciToECEF(eci, M_PI / 2.0);
+    EXPECT_NEAR(ecef.x, 0.0, 1e-10);
+    EXPECT_NEAR(ecef.y, -1000.0, 1e-10);
+    EXPECT_NEAR(ecef.z, 0.0, 1e-10);
+}
+
+TEST(ECIToECEFTest, ZUnchanged) {
+    // Z component should remain unchanged regardless of GST
+    Vec3 eci{0.0, 0.0, 5000.0};
+    Vec3 ecef = eciToECEF(eci, 1.234);
+    EXPECT_NEAR(ecef.z, 5000.0, 1e-10);
+}
+
+TEST(ECIToECEFTest, PreservesMagnitude) {
+    // Rotation should preserve the magnitude of the vector
+    Vec3 eci{1000.0, 2000.0, 3000.0};
+    Vec3 ecef = eciToECEF(eci, 0.789);
+    EXPECT_NEAR(ecef.magnitude(), eci.magnitude(), 1e-10);
+}
+
+// ============================================================================
+// ECEF to Geodetic Tests
+// ============================================================================
+
+TEST(ECEFToGeodeticTest, EquatorPrimeMeridian) {
+    // Point on equator at prime meridian at Earth's surface
+    // WGS84 semi-major axis = 6378.137 km
+    Vec3 ecef{6378.137, 0.0, 0.0};
+    Geodetic geo = ecefToGeodetic(ecef);
+    EXPECT_NEAR(geo.latInRadians, 0.0, 1e-6);
+    EXPECT_NEAR(geo.lonInRadians, 0.0, 1e-6);
+    EXPECT_NEAR(geo.altInKilometers, 0.0, 0.01);
+}
+
+TEST(ECEFToGeodeticTest, NorthPole) {
+    // Point at North Pole at Earth's surface
+    // WGS84 semi-minor axis ≈ 6356.752314 km
+    Vec3 ecef{0.0, 0.0, 6356.752314};
+    Geodetic geo = ecefToGeodetic(ecef);
+    // Latitude should be 90 degrees (π/2 radians)
+    EXPECT_NEAR(geo.latInRadians, M_PI / 2.0, 1e-4);
+    // Note: altitude calculation at poles uses p/cos(lat) which is unstable
+    // Just verify latitude is correct; altitude at poles is a known edge case
+}
+
+TEST(ECEFToGeodeticTest, Longitude90East) {
+    // Point on equator at 90° East
+    Vec3 ecef{0.0, 6378.137, 0.0};
+    Geodetic geo = ecefToGeodetic(ecef);
+    EXPECT_NEAR(geo.latInRadians, 0.0, 1e-6);
+    EXPECT_NEAR(geo.lonInRadians, M_PI / 2.0, 1e-6);
+}
+
+TEST(ECEFToGeodeticTest, ISSAltitude) {
+    // ISS is approximately at 420 km altitude
+    // Point on equator at prime meridian, 420 km above surface
+    Vec3 ecef{6378.137 + 420.0, 0.0, 0.0};
+    Geodetic geo = ecefToGeodetic(ecef);
+    EXPECT_NEAR(geo.altInKilometers, 420.0, 1.0);
+}
+
+// ============================================================================
+// Orbit Anomaly Calculation Tests
+// ============================================================================
+
+TEST_F(OrbitTest, MeanAnomalyAtEpoch) {
+    orbit.updateFromTLE(ISS_TLE);
+    double epochJD = toJulianDate(orbit.getEpoch());
+    double M = orbit.getMeanAnomalyAtTime(epochJD);
+    // Should match the TLE mean anomaly (175.9840 degrees) in radians
+    double expectedM = 175.9840 * M_PI / 180.0;
+    EXPECT_NEAR(M, expectedM, 1e-6);
+}
+
+TEST_F(OrbitTest, MeanAnomalyInRange) {
+    orbit.updateFromTLE(ISS_TLE);
+    double epochJD = toJulianDate(orbit.getEpoch());
+    // Test at various times
+    for (double dt = 0; dt < 1.0; dt += 0.1) {
+        double M = orbit.getMeanAnomalyAtTime(epochJD + dt);
+        EXPECT_GE(M, 0.0);
+        EXPECT_LT(M, 2.0 * M_PI);
+    }
+}
+
+TEST_F(OrbitTest, EccentricAnomalyCircularOrbit) {
+    orbit.updateFromTLE(ISS_TLE);
+    // For nearly circular orbits (e ≈ 0), E ≈ M
+    double M = M_PI / 4.0;  // 45 degrees
+    double E = orbit.getEccentricAnomalyFromMeanAnomaly(M);
+    // ISS has e ≈ 0.0003723, so E should be very close to M
+    EXPECT_NEAR(E, M, 0.001);
+}
+
+TEST_F(OrbitTest, EccentricAnomalyKeplerEquation) {
+    orbit.updateFromTLE(ISS_TLE);
+    // Verify Kepler's equation: M = E - e*sin(E)
+    double M = 1.0;  // radians
+    double E = orbit.getEccentricAnomalyFromMeanAnomaly(M);
+    double e = orbit.getEccentricity();
+    double computedM = E - e * std::sin(E);
+    EXPECT_NEAR(computedM, M, 1e-10);
+}
+
+TEST_F(OrbitTest, TrueAnomalyCircularOrbit) {
+    orbit.updateFromTLE(ISS_TLE);
+    // For nearly circular orbits, true anomaly ≈ eccentric anomaly ≈ mean anomaly
+    double E = M_PI / 3.0;  // 60 degrees
+    double nu = orbit.getTrueAnomalyFromEccentricAnomaly(E);
+    EXPECT_NEAR(nu, E, 0.001);
+}
+
+TEST_F(OrbitTest, TrueAnomalyAtZero) {
+    orbit.updateFromTLE(ISS_TLE);
+    // At E = 0, true anomaly should also be 0
+    double nu = orbit.getTrueAnomalyFromEccentricAnomaly(0.0);
+    EXPECT_NEAR(nu, 0.0, 1e-10);
+}
+
+TEST_F(OrbitTest, TrueAnomalyAtPi) {
+    orbit.updateFromTLE(ISS_TLE);
+    // At E = π, true anomaly should also be π
+    double nu = orbit.getTrueAnomalyFromEccentricAnomaly(M_PI);
+    EXPECT_NEAR(nu, M_PI, 1e-10);
+}
+
+TEST_F(OrbitTest, TrueAnomalyAtTimeReturnsValidRange) {
+    orbit.updateFromTLE(ISS_TLE);
+    double epochJD = toJulianDate(orbit.getEpoch());
+    double nu = orbit.getTrueAnomalyAtTime(epochJD);
+    // True anomaly should be in range [-π, π] or [0, 2π)
+    EXPECT_GE(nu, -M_PI);
+    EXPECT_LE(nu, M_PI);
+}
+
+// ============================================================================
+// ECI Position Tests
+// ============================================================================
+
+TEST_F(OrbitTest, ECIReturnsReasonableAltitude) {
+    orbit.updateFromTLE(ISS_TLE);
+    double nu = 0.0;  // At perigee
+    Vec3 eci = orbit.getECI(nu);
+    double r = eci.magnitude();
+    // ISS altitude is ~420 km, Earth radius ~6378 km
+    // So distance from Earth center should be ~6798 km
+    EXPECT_GT(r, 6700.0);
+    EXPECT_LT(r, 6900.0);
+}
+
+TEST_F(OrbitTest, ECIOrbitIsNearlyCircular) {
+    orbit.updateFromTLE(ISS_TLE);
+    // Check radius at perigee (nu=0) and apogee (nu=π)
+    Vec3 eciPerigee = orbit.getECI(0.0);
+    Vec3 eciApogee = orbit.getECI(M_PI);
+    double rPerigee = eciPerigee.magnitude();
+    double rApogee = eciApogee.magnitude();
+    // For ISS with e ≈ 0.0003723, the difference should be small
+    double diff = std::abs(rApogee - rPerigee);
+    EXPECT_LT(diff, 10.0);  // Less than 10 km difference
+}
+
+TEST_F(OrbitTest, ECIInclinationConsistent) {
+    orbit.updateFromTLE(ISS_TLE);
+    Vec3 eci = orbit.getECI(M_PI / 2.0);  // At ascending node + 90°
+    double r = eci.magnitude();
+    // The z component at this point indicates the inclination
+    // For ISS with i ≈ 51.6°, z/r should be approximately sin(51.6°)
+    double sinI = eci.z / r;
+    double expectedSinI = std::sin(51.6312 * M_PI / 180.0);
+    EXPECT_NEAR(std::abs(sinI), expectedSinI, 0.01);
+}
+
 }  // namespace
 }  // namespace sattrack
