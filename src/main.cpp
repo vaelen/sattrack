@@ -138,6 +138,7 @@ int main(int argc, char* argv[]) {
     config.setAltitude(0.0);
     config.setDays(1);
     config.setMinimumElevation(10);
+    config.setVerbose(false);
 
     auto configFile = expandTilde("~/.sattrack.toml");
 
@@ -184,6 +185,7 @@ int main(int argc, char* argv[]) {
         "Norad ID of satellite to stop tracking");
 
     auto tleCommand = app.add_subcommand("tle", "Display TLE");
+    auto parseTLECommand = tleCommand->add_subcommand("parse", "Parse TLE and display orbital elements");
 
     auto passesCommand = app.add_subcommand("passes", "Display future passes");
     passesCommand->add_option_function<int>("--days", 
@@ -211,11 +213,15 @@ int main(int argc, char* argv[]) {
         }
     );
 
-    tleCommand->final_callback([&config](void) {
+    tleCommand->final_callback([&config, tleCommand](void) {
+        // Skip if a subcommand was invoked
+        if (!tleCommand->get_subcommands().empty()) {
+            return;
+        }
         try {
             for (auto noradID : config.getSatellites()) {
                 auto response = n2yo::getTLE(config.getAPIKey(), noradID, config.getVerbose());
-                std::cout << "TLE for " << response.info.name << " (" << noradID << "):" << std::endl;
+                std::cout << response.info.name << std::endl;
                 std::cout << response.tle << std::endl << std::endl;
             }
         } catch (const std::exception &err) {
@@ -223,6 +229,39 @@ int main(int argc, char* argv[]) {
             std::exit(1);
         }
     });
+
+    parseTLECommand->final_callback([&config](void) {
+        try {
+            for (auto noradID : config.getSatellites()) {
+                auto response = n2yo::getTLE(config.getAPIKey(), noradID, config.getVerbose());
+                std::cout << response.info.name << std::endl;
+                sattrack::Orbit orbit;
+                orbit.updateFromTLE(response.tle);
+                std::cout << "  NORAD ID: " << orbit.getNoradID() << std::endl;
+                std::cout << "  Classification: " << orbit.getClassification() << std::endl;
+                std::cout << "  Designator: " << orbit.getDesignator() << std::endl;
+                auto epoch = orbit.getEpoch();
+                std::cout << "  Epoch: " << std::format("{:%F %T %Z}", std::chrono::zoned_time{"UTC", epoch}) << std::endl;
+                std::cout << "  First Derivative of Mean Motion: " << orbit.getFirstDerivativeMeanMotion() << std::endl;
+                std::cout << "  Second Derivative of Mean Motion: " << orbit.getSecondDerivativeMeanMotion() << std::endl;
+                std::cout << "  Bstar Drag Term: " << orbit.getBstarDragTerm() << std::endl;
+                std::cout << "  Element Set Number: " << orbit.getElementSetNumber() << std::endl;
+                std::cout << "  Inclination: " << orbit.getInclination() << " deg" << std::endl;
+                std::cout << "  Right Ascension of Ascending Node: " << orbit.getRAAN() << " deg" << std::endl;
+                std::cout << "  Eccentricity: " << orbit.getEccentricity() << std::endl;
+                std::cout << "  Argument of Perigee: " << orbit.getArgumentOfPerigee() << " deg" << std::endl;
+                std::cout << "  Mean Anomaly: " << orbit.getMeanAnomaly() << " deg" << std::endl;
+                std::cout << "  Mean Motion: " << orbit.getMeanMotion() << " revs per day" << std::endl;
+                std::cout << "  Revolution Number at Epoch: " << orbit.getRevolutionNumberAtEpoch() << std::endl;
+                std::cout << std::endl;
+            }
+        } catch (const std::exception &err) {
+            std::cerr << err.what() << std::endl;
+            std::exit(1);
+        }
+    });
+
+    
 
     passesCommand->final_callback([&config](void) {
         printPasses(config);
