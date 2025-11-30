@@ -7,12 +7,37 @@
 #define __SATTRACK_ORBIT_HPP
 
 #include <chrono>
+#include <cmath>
 #include <string>
 #include <string_view>
 
 namespace sattrack {
 
 using time_point = std::chrono::system_clock::time_point;
+
+struct Vec3 {
+    double x, y, z;
+    
+    Vec3 operator+(const Vec3& other) const {
+        return {x + other.x, y + other.y, z + other.z};
+    }
+    
+    Vec3 operator*(double scalar) const {
+        return {x * scalar, y * scalar, z * scalar};
+    }
+    
+    double magnitude() const {
+        return std::sqrt(x*x + y*y + z*z);
+    }
+};
+
+// ECEF to geodetic (lat/lon/altitude)
+// Uses WGS84 ellipsoid, iterative method
+struct Geodetic {
+    double latInRadians;
+    double lonInRadians;
+    double altInKilometers;
+};
 
 class Orbit {
 public:
@@ -37,7 +62,12 @@ public:
     double getMeanAnomaly() const;
     double getMeanMotion() const;
     int getRevolutionNumberAtEpoch() const;
-
+    
+    double getMeanAnomalyAtTime(const double julianDate) const;
+    double getEccentricAnomalyFromMeanAnomaly(double meanAnomalyInRadians, double tolerance = 1e-12) const;
+    double getTrueAnomalyFromEccentricAnomaly(double eccentricAnomalyInRadians) const;
+    double getTrueAnomalyAtTime(const double julianDate) const;
+    Vec3 getECI(double trueAnomalyInRadians) const;
 private:
 // First Line - Satellite Identification
     int noradID;
