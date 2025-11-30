@@ -27,7 +27,7 @@ Makefile
 *.la
 
 # Executables
-sattrack
+bin/sattrack
 *.exe
 *.out
 *.app
