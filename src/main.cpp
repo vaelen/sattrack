@@ -261,15 +261,11 @@ int main(int argc, char* argv[]) {
         }
     });
 
-    
-
     passesCommand->final_callback([&config](void) {
         printPasses(config);
     });
 
     CLI11_PARSE(app, argc, argv);
-
-    //return sattrack::startGUI(argc, argv);
 
     return 0;
 }
