@@ -7,7 +7,7 @@ SatTrack is a command-line utility for tracking satellites and predicting when t
 Install dependencies:
 
 ```sh
-sudo apt install build-essential cmake libcurl4-openssl-dev libcurlpp-dev rapidjson-dev libcli11-dev
+sudo apt install build-essential cmake libcurl4-openssl-dev libcurlpp-dev rapidjson-dev libcli11-dev libgtest-dev
 ```
 
 Build the application:

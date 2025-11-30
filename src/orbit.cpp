@@ -14,6 +14,12 @@
 
 namespace sattrack {
 
+// Helper function to trim leading spaces from a string_view
+std::string_view trimLeft(const std::string_view &str) {
+    auto pos = str.find_first_not_of(' ');
+    return pos == std::string_view::npos ? "" : str.substr(pos);
+}
+
 // Helper function to convert substring to numeric type
 template <typename T>
 inline T toNumber(const std::string_view &str) {
@@ -29,17 +35,22 @@ inline T toNumber(const std::string_view &str) {
 inline double fromExponentialString(const std::string_view &str) {
     // Example input: "11606-4" -> 0.00011606
 
+    bool isNegative = true;
     auto pos = str.find('-');
     if (pos == std::string_view::npos) {
-        throw std::invalid_argument("Invalid exponential format: " + std::string(str));
+        isNegative = false;
+        pos = str.find('+');
+        if (pos == std::string_view::npos) {
+            throw std::invalid_argument("Invalid exponential format: " + std::string(str));
+        }
     }
 
-    std::string_view baseView = str.substr(0, pos);
+    std::string_view baseView = "0." + std::string(str.substr(0, pos));
     std::string_view exponentView = str.substr(pos + 1);
 
     double base = toNumber<double>(baseView);;
     int exponent = toNumber<int>(exponentView);
-    double value = base * std::pow(10.0, -exponent);
+    double value = base * std::pow(10.0, isNegative ? -exponent : exponent);
     return value;
 }
 
@@ -47,8 +58,8 @@ inline double fromExponentialString(const std::string_view &str) {
 auto parseEpoch(const std::string_view &epochStr) {
     using namespace std::chrono;
 
-    int y = toNumber<int>(epochStr.substr(0, 2));
-    double dayOfYear = toNumber<double>(epochStr.substr(2));
+    int y = toNumber<int>(trimLeft(epochStr.substr(0, 2)));
+    double dayOfYear = toNumber<double>(trimLeft(epochStr.substr(2)));
 
     // Convert two-digit year to four-digit year
     if (y < 57) {
@@ -74,37 +85,37 @@ void Orbit::updateFromTLE(const std::string_view &tle) {
         std::string_view lineView(line.begin(), line.end());
         if (lineView.starts_with("1 ")) {
             // NORAD ID is columns 3-7
-            noradID = toNumber<int>(lineView.substr(2, 5));
+            noradID = toNumber<int>(trimLeft(lineView.substr(2, 5)));
             // Classification is column 8
             classification = lineView[7];
             // Designator is columns 10-17
             designator = std::string(lineView.substr(9, 8));
             // First Derivative of Mean Motion is columns 34-43
-            firstDerivativeMeanMotion = toNumber<double>(lineView.substr(33, 10));
+            firstDerivativeMeanMotion = toNumber<double>(trimLeft(lineView.substr(33, 10)));
             // Second Derivative of Mean Motion is columns 45-52 (exponential format)
-            secondDerivativeMeanMotion = fromExponentialString(lineView.substr(44, 8));
+            secondDerivativeMeanMotion = fromExponentialString(trimLeft(lineView.substr(44, 8)));
             // Bstar Drag Term is columns 54-61 (exponential format)
-            bstarDragTerm = fromExponentialString(lineView.substr(53, 8));
+            bstarDragTerm = fromExponentialString(trimLeft(lineView.substr(53, 8)));
             // Time since epoch is columns 19-32
             epoch = parseEpoch(lineView.substr(18, 14));
             // Element Set Number is columns 65-68
-            elementSetNumber = toNumber<int>(lineView.substr(64, 4));
+            elementSetNumber = toNumber<int>(trimLeft(lineView.substr(64, 4)));
             firstLineParsed = true;
         } else if (lineView.starts_with("2 ")) {
             // Inclination is columns 9-16
-            inclination = toNumber<double>(lineView.substr(8, 8));
+            inclination = toNumber<double>(trimLeft(lineView.substr(8, 8)));
             // RAAN is columns 18-25
-            raan = toNumber<double>(lineView.substr(17, 8));
+            raan = toNumber<double>(trimLeft(lineView.substr(17, 8)));
             // Eccentricity is columns 27-33 (decimal implied)
-            eccentricity = toNumber<double>("0." + std::string(lineView.substr(26, 7)));
+            eccentricity = toNumber<double>("0." + std::string(trimLeft(lineView.substr(26, 7))));
             // Argument of perigee is columns 35-42
-            argumentOfPerigee = toNumber<double>(lineView.substr(34, 8));
+            argumentOfPerigee = toNumber<double>(trimLeft(lineView.substr(34, 8)));
             // Mean Anomaly is columns 44-51
-            meanAnomaly = toNumber<double>(lineView.substr(43, 8));
+            meanAnomaly = toNumber<double>(trimLeft(lineView.substr(43, 8)));
             // Mean Motion is columns 53-63
-            meanMotion = toNumber<double>(lineView.substr(52, 11));
+            meanMotion = toNumber<double>(trimLeft(lineView.substr(52, 11)));
             // Revolution number at epoch is columns 64-68
-            revolutionNumberAtEpoch = toNumber<int>(lineView.substr(63, 5));
+            revolutionNumberAtEpoch = toNumber<int>(trimLeft(lineView.substr(63, 5)));
             secondLineParsed = true;
         }
         if (firstLineParsed && secondLineParsed) {

@@ -17,6 +17,9 @@ find_package(PkgConfig REQUIRED)
 # Find libcurl
 find_package(CURL REQUIRED)
 
+# Find GTest (optional, for testing)
+find_package(GTest QUIET)
+
 # RapidJSON (header-only library)
 find_path(RAPIDJSON_INCLUDE_DIRS "rapidjson/rapidjson.h"
     PATHS
@@ -89,9 +92,14 @@ target_link_libraries(sattrack
 install(TARGETS sattrack DESTINATION bin)
 
 # Optional: Enable testing
-if(EXISTS ${CMAKE_SOURCE_DIR}/tests/CMakeLists.txt)
+if(GTest_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/tests/CMakeLists.txt)
     enable_testing()
     add_subdirectory(tests)
+    message(STATUS "  GTest: Found - tests enabled")
+else()
+    if(NOT GTest_FOUND)
+        message(STATUS "  GTest: Not found - tests disabled")
+    endif()
 endif()
 
 # Print configuration summary
