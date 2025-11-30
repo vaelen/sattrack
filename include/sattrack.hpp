@@ -8,5 +8,6 @@
 
 #include <sattrack/config.hpp>
 #include <sattrack/n2yo.hpp>
+#include <sattrack/orbit.hpp>
 
 #endif

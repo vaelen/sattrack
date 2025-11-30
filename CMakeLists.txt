@@ -72,6 +72,7 @@ set(SOURCES
     src/main.cpp
     src/n2yo.cpp
     src/config.cpp
+    src/orbit.cpp
     # Add more source files here as you create them
 )
 
