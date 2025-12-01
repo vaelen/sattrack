@@ -8,6 +8,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <map>
 #include <sstream>
 #include <string>
 
@@ -646,6 +647,404 @@ TEST_F(OrbitTest, PrintInfo_OutputIsNotEmpty) {
     std::ostringstream oss;
     orbit.printInfo(oss);
     EXPECT_FALSE(oss.str().empty());
+}
+
+// ============================================================================
+// loadTLEDatabase Tests
+// ============================================================================
+
+TEST(LoadTLEDatabaseTest, LoadSingleSatellite) {
+    std::istringstream input(
+        "ISS (ZARYA)\n"
+        "1 25544U 98067A   25333.83453771  .00008010  00000+0  15237-3 0  9993\n"
+        "2 25544  51.6312 206.3646 0003723 184.1118 175.9840 15.49193835540850\n"
+    );
+
+    std::map<int, Orbit> database;
+    loadTLEDatabase(input, database);
+
+    EXPECT_EQ(database.size(), 1);
+    EXPECT_TRUE(database.contains(25544));
+    EXPECT_EQ(database[25544].getName(), "ISS (ZARYA)");
+    EXPECT_EQ(database[25544].getNoradID(), 25544);
+}
+
+TEST(LoadTLEDatabaseTest, LoadMultipleSatellites) {
+    std::istringstream input(
+        "ISS (ZARYA)\n"
+        "1 25544U 98067A   25333.83453771  .00008010  00000+0  15237-3 0  9993\n"
+        "2 25544  51.6312 206.3646 0003723 184.1118 175.9840 15.49193835540850\n"
+        "NOAA 19\n"
+        "1 33591U 09005A   25333.78204194  .00000054  00000+0  52635-4 0  9999\n"
+        "2 33591  98.9785  39.2910 0013037 231.6546 128.3455 14.13431889866318\n"
+    );
+
+    std::map<int, Orbit> database;
+    loadTLEDatabase(input, database);
+
+    EXPECT_EQ(database.size(), 2);
+    EXPECT_TRUE(database.contains(25544));
+    EXPECT_TRUE(database.contains(33591));
+    EXPECT_EQ(database[25544].getName(), "ISS (ZARYA)");
+    EXPECT_EQ(database[33591].getName(), "NOAA 19");
+}
+
+TEST(LoadTLEDatabaseTest, LoadEmptyStream) {
+    std::istringstream input("");
+
+    std::map<int, Orbit> database;
+    loadTLEDatabase(input, database);
+
+    EXPECT_TRUE(database.empty());
+}
+
+TEST(LoadTLEDatabaseTest, LoadWithBlankLines) {
+    std::istringstream input(
+        "\n"
+        "ISS (ZARYA)\n"
+        "\n"
+        "1 25544U 98067A   25333.83453771  .00008010  00000+0  15237-3 0  9993\n"
+        "\n"
+        "2 25544  51.6312 206.3646 0003723 184.1118 175.9840 15.49193835540850\n"
+        "\n"
+    );
+
+    std::map<int, Orbit> database;
+    loadTLEDatabase(input, database);
+
+    EXPECT_EQ(database.size(), 1);
+    EXPECT_TRUE(database.contains(25544));
+}
+
+TEST(LoadTLEDatabaseTest, PreservesOrbitalElements) {
+    std::istringstream input(
+        "ISS (ZARYA)\n"
+        "1 25544U 98067A   25333.83453771  .00008010  00000+0  15237-3 0  9993\n"
+        "2 25544  51.6312 206.3646 0003723 184.1118 175.9840 15.49193835540850\n"
+    );
+
+    std::map<int, Orbit> database;
+    loadTLEDatabase(input, database);
+
+    const Orbit& iss = database[25544];
+    EXPECT_DOUBLE_EQ(iss.getInclination(), 51.6312);
+    EXPECT_DOUBLE_EQ(iss.getRightAscensionOfAscendingNode(), 206.3646);
+    EXPECT_NEAR(iss.getEccentricity(), 0.0003723, 1e-8);
+    EXPECT_NEAR(iss.getMeanMotion(), 15.49193835, 1e-6);
+}
+
+TEST(LoadTLEDatabaseTest, AppendsToExistingDatabase) {
+    std::map<int, Orbit> database;
+
+    // Load first satellite
+    std::istringstream input1(
+        "ISS (ZARYA)\n"
+        "1 25544U 98067A   25333.83453771  .00008010  00000+0  15237-3 0  9993\n"
+        "2 25544  51.6312 206.3646 0003723 184.1118 175.9840 15.49193835540850\n"
+    );
+    loadTLEDatabase(input1, database);
+    EXPECT_EQ(database.size(), 1);
+
+    // Load second satellite
+    std::istringstream input2(
+        "NOAA 19\n"
+        "1 33591U 09005A   25333.78204194  .00000054  00000+0  52635-4 0  9999\n"
+        "2 33591  98.9785  39.2910 0013037 231.6546 128.3455 14.13431889866318\n"
+    );
+    loadTLEDatabase(input2, database);
+
+    EXPECT_EQ(database.size(), 2);
+    EXPECT_TRUE(database.contains(25544));
+    EXPECT_TRUE(database.contains(33591));
+}
+
+TEST(LoadTLEDatabaseTest, UpdatesExistingEntry) {
+    std::map<int, Orbit> database;
+
+    // Load ISS with one epoch
+    std::istringstream input1(
+        "ISS (ZARYA)\n"
+        "1 25544U 98067A   25333.83453771  .00008010  00000+0  15237-3 0  9993\n"
+        "2 25544  51.6312 206.3646 0003723 184.1118 175.9840 15.49193835540850\n"
+    );
+    loadTLEDatabase(input1, database);
+
+    // Load ISS with updated data (different mean anomaly)
+    std::istringstream input2(
+        "ISS (ZARYA)\n"
+        "1 25544U 98067A   25334.83453771  .00008010  00000+0  15237-3 0  9993\n"
+        "2 25544  51.6312 206.3646 0003723 184.1118 200.0000 15.49193835540850\n"
+    );
+    loadTLEDatabase(input2, database);
+
+    // Should still have only one entry, but with updated data
+    EXPECT_EQ(database.size(), 1);
+    EXPECT_DOUBLE_EQ(database[25544].getMeanAnomaly(), 200.0000);
+}
+
+TEST(LoadTLEDatabaseTest, TwoLineFormatWithoutName) {
+    std::istringstream input(
+        "1 25544U 98067A   25333.83453771  .00008010  00000+0  15237-3 0  9993\n"
+        "2 25544  51.6312 206.3646 0003723 184.1118 175.9840 15.49193835540850\n"
+    );
+
+    std::map<int, Orbit> database;
+    loadTLEDatabase(input, database);
+
+    EXPECT_EQ(database.size(), 1);
+    EXPECT_TRUE(database.contains(25544));
+    // Name should be empty for 2-line format
+    EXPECT_TRUE(database[25544].getName().empty());
+}
+
+TEST(LoadTLEDatabaseTest, LookupByNoradID) {
+    std::istringstream input(
+        "ISS (ZARYA)\n"
+        "1 25544U 98067A   25333.83453771  .00008010  00000+0  15237-3 0  9993\n"
+        "2 25544  51.6312 206.3646 0003723 184.1118 175.9840 15.49193835540850\n"
+        "NOAA 19\n"
+        "1 33591U 09005A   25333.78204194  .00000054  00000+0  52635-4 0  9999\n"
+        "2 33591  98.9785  39.2910 0013037 231.6546 128.3455 14.13431889866318\n"
+    );
+
+    std::map<int, Orbit> database;
+    loadTLEDatabase(input, database);
+
+    // Test lookup of existing IDs
+    EXPECT_TRUE(database.contains(25544));
+    EXPECT_TRUE(database.contains(33591));
+
+    // Test lookup of non-existing ID
+    EXPECT_FALSE(database.contains(99999));
+}
+
+// ============================================================================
+// getTLE Round-Trip Tests
+// ============================================================================
+
+TEST_F(OrbitTest, GetTLE_RoundTrip_ISS) {
+    // Known good 3-line TLE for ISS
+    const std::string originalTLE =
+        "ISS (ZARYA)\n"
+        "1 25544U 98067A   25333.83453771  .00008010  00000+0  15237-3 0  9993\n"
+        "2 25544  51.6312 206.3646 0003723 184.1118 175.9840 15.49193835540850\n";
+
+    orbit.updateFromTLE(originalTLE);
+    std::string regeneratedTLE = orbit.getTLE();
+
+    EXPECT_EQ(originalTLE, regeneratedTLE);
+}
+
+TEST_F(OrbitTest, GetTLE_RoundTrip_NOAA19) {
+    // Known good 3-line TLE for NOAA 19
+    const std::string originalTLE =
+        "NOAA 19\n"
+        "1 33591U 09005A   25333.78204194  .00000054  00000+0  52635-4 0  9999\n"
+        "2 33591  98.9785  39.2910 0013037 231.6546 128.3455 14.13431889866318\n";
+
+    orbit.updateFromTLE(originalTLE);
+    std::string regeneratedTLE = orbit.getTLE();
+
+    EXPECT_EQ(originalTLE, regeneratedTLE);
+}
+
+TEST_F(OrbitTest, GetTLE_ContainsName) {
+    orbit.updateFromTLE(TLE_WITH_NAME);
+    std::string tle = orbit.getTLE();
+
+    // First line should be the satellite name
+    EXPECT_TRUE(tle.starts_with("ISS (ZARYA)\n"));
+}
+
+TEST_F(OrbitTest, GetTLE_Line1StartsCorrectly) {
+    orbit.updateFromTLE(TLE_WITH_NAME);
+    std::string tle = orbit.getTLE();
+
+    // Find the second line (line 1 of TLE)
+    auto firstNewline = tle.find('\n');
+    auto line1Start = tle.substr(firstNewline + 1, 2);
+    EXPECT_EQ(line1Start, "1 ");
+}
+
+TEST_F(OrbitTest, GetTLE_Line2StartsCorrectly) {
+    orbit.updateFromTLE(TLE_WITH_NAME);
+    std::string tle = orbit.getTLE();
+
+    // Find line 2 of TLE
+    auto firstNewline = tle.find('\n');
+    auto secondNewline = tle.find('\n', firstNewline + 1);
+    auto line2Start = tle.substr(secondNewline + 1, 2);
+    EXPECT_EQ(line2Start, "2 ");
+}
+
+TEST_F(OrbitTest, GetTLE_ContainsNoradID) {
+    orbit.updateFromTLE(TLE_WITH_NAME);
+    std::string tle = orbit.getTLE();
+
+    // NORAD ID 25544 should appear in line 1 and line 2
+    EXPECT_NE(tle.find("25544"), std::string::npos);
+}
+
+TEST_F(OrbitTest, GetTLE_ReloadProducesSameOrbit) {
+    // Load original TLE
+    orbit.updateFromTLE(TLE_WITH_NAME);
+
+    // Get regenerated TLE
+    std::string regeneratedTLE = orbit.getTLE();
+
+    // Load regenerated TLE into a new Orbit
+    Orbit orbit2;
+    orbit2.updateFromTLE(regeneratedTLE);
+
+    // Compare all orbital elements
+    EXPECT_EQ(orbit.getNoradID(), orbit2.getNoradID());
+    EXPECT_EQ(orbit.getName(), orbit2.getName());
+    EXPECT_EQ(orbit.getClassification(), orbit2.getClassification());
+    EXPECT_EQ(orbit.getDesignator(), orbit2.getDesignator());
+    EXPECT_DOUBLE_EQ(orbit.getInclination(), orbit2.getInclination());
+    EXPECT_DOUBLE_EQ(orbit.getRightAscensionOfAscendingNode(), orbit2.getRightAscensionOfAscendingNode());
+    EXPECT_DOUBLE_EQ(orbit.getEccentricity(), orbit2.getEccentricity());
+    EXPECT_DOUBLE_EQ(orbit.getArgumentOfPerigee(), orbit2.getArgumentOfPerigee());
+    EXPECT_DOUBLE_EQ(orbit.getMeanAnomaly(), orbit2.getMeanAnomaly());
+    EXPECT_DOUBLE_EQ(orbit.getMeanMotion(), orbit2.getMeanMotion());
+    EXPECT_EQ(orbit.getRevolutionNumberAtEpoch(), orbit2.getRevolutionNumberAtEpoch());
+}
+
+TEST_F(OrbitTest, GetTLE_TwoLineFormat) {
+    // Test with 2-line format (no name)
+    orbit.updateFromTLE(ISS_TLE);
+    std::string tle = orbit.getTLE();
+
+    // Should still produce valid output (with empty name line)
+    EXPECT_TRUE(tle.find("1 ") != std::string::npos);
+    EXPECT_TRUE(tle.find("2 ") != std::string::npos);
+}
+
+// ============================================================================
+// calculateChecksum Tests
+// ============================================================================
+
+TEST(CalculateChecksumTest, AllDigits) {
+    // Sum of 1+2+3+4+5 = 15, mod 10 = 5
+    EXPECT_EQ(calculateChecksum("12345"), 5);
+}
+
+TEST(CalculateChecksumTest, WithMinusSigns) {
+    // Each '-' counts as 1
+    // Sum of 1+2+1+3+1 = 8 (the '-' signs each add 1)
+    EXPECT_EQ(calculateChecksum("12-3-"), 8);
+}
+
+TEST(CalculateChecksumTest, WithLettersAndSpaces) {
+    // Letters, spaces, and other chars are ignored
+    // Only 1+2+3 = 6
+    EXPECT_EQ(calculateChecksum("1 A 2 B 3"), 6);
+}
+
+TEST(CalculateChecksumTest, EmptyString) {
+    EXPECT_EQ(calculateChecksum(""), 0);
+}
+
+TEST(CalculateChecksumTest, RealTLELine1) {
+    // Real TLE line 1 for ISS (without checksum digit)
+    // The checksum should be 3
+    std::string line1 = "1 25544U 98067A   25333.83453771  .00008010  00000+0  15237-3 0  999";
+    EXPECT_EQ(calculateChecksum(line1), 3);
+}
+
+TEST(CalculateChecksumTest, RealTLELine2) {
+    // Real TLE line 2 for ISS (without checksum digit)
+    // The checksum should be 0
+    std::string line2 = "2 25544  51.6312 206.3646 0003723 184.1118 175.9840 15.4919383554085";
+    EXPECT_EQ(calculateChecksum(line2), 0);
+}
+
+TEST(CalculateChecksumTest, OnlyMinusSigns) {
+    // Three minus signs = 3
+    EXPECT_EQ(calculateChecksum("---"), 3);
+}
+
+TEST(CalculateChecksumTest, LargeSum) {
+    // 9+9+9+9+9 = 45, mod 10 = 5
+    EXPECT_EQ(calculateChecksum("99999"), 5);
+}
+
+// ============================================================================
+// toTLEExponential Tests
+// ============================================================================
+
+TEST(ToTLEExponentialTest, Zero) {
+    EXPECT_EQ(toTLEExponential(0.0), " 00000+0");
+}
+
+TEST(ToTLEExponentialTest, PositiveSmallValue) {
+    // 0.00015237 -> mantissa 15237, exponent -3
+    // Format: " 15237-3"
+    EXPECT_EQ(toTLEExponential(0.00015237), " 15237-3");
+}
+
+TEST(ToTLEExponentialTest, NegativeValue) {
+    // -0.00015237 -> "-15237-3"
+    EXPECT_EQ(toTLEExponential(-0.00015237), "-15237-3");
+}
+
+TEST(ToTLEExponentialTest, VerySmallValue) {
+    // 0.000052635 -> " 52635-4"
+    EXPECT_EQ(toTLEExponential(0.000052635), " 52635-4");
+}
+
+TEST(ToTLEExponentialTest, PositiveExponent) {
+    // 1.5 -> mantissa 15000, exponent +1
+    // Format: " 15000+1"
+    EXPECT_EQ(toTLEExponential(1.5), " 15000+1");
+}
+
+TEST(ToTLEExponentialTest, ExactlyOne) {
+    // 1.0 -> " 10000+1"
+    EXPECT_EQ(toTLEExponential(1.0), " 10000+1");
+}
+
+TEST(ToTLEExponentialTest, TinyValue) {
+    // 1e-10 -> " 10000-9"
+    EXPECT_EQ(toTLEExponential(1e-10), " 10000-9");
+}
+
+// ============================================================================
+// formatFirstDerivative Tests
+// ============================================================================
+
+TEST(FormatFirstDerivativeTest, Zero) {
+    EXPECT_EQ(formatFirstDerivative(0.0), " .00000000");
+}
+
+TEST(FormatFirstDerivativeTest, PositiveValue) {
+    // 0.00008010 -> " .00008010"
+    EXPECT_EQ(formatFirstDerivative(0.00008010), " .00008010");
+}
+
+TEST(FormatFirstDerivativeTest, NegativeValue) {
+    // -0.00008010 -> "-.00008010"
+    EXPECT_EQ(formatFirstDerivative(-0.00008010), "-.00008010");
+}
+
+TEST(FormatFirstDerivativeTest, SmallPositiveValue) {
+    // 0.00000054 -> " .00000054"
+    EXPECT_EQ(formatFirstDerivative(0.00000054), " .00000054");
+}
+
+TEST(FormatFirstDerivativeTest, LargerValue) {
+    // 0.12345678 -> " .12345678"
+    EXPECT_EQ(formatFirstDerivative(0.12345678), " .12345678");
+}
+
+TEST(FormatFirstDerivativeTest, RoundingUp) {
+    // 0.000000005 should round to 0.00000001
+    EXPECT_EQ(formatFirstDerivative(0.000000005), " .00000001");
+}
+
+TEST(FormatFirstDerivativeTest, RoundingDown) {
+    // 0.000000004 should round to 0.00000000
+    EXPECT_EQ(formatFirstDerivative(0.000000004), " .00000000");
 }
 
 }  // namespace

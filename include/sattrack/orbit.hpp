@@ -10,6 +10,7 @@
 #include <cmath>
 #include <string>
 #include <string_view>
+#include <map>
 
 namespace sattrack {
 
@@ -74,6 +75,7 @@ public:
     Geodetic getGeodeticLocationAtTime(const double julianDate) const;
 
     void printInfo(std::ostream &os) const;
+    std::string getTLE() const;
 private:
 // Satellite Identification
     std::string name;
@@ -103,6 +105,16 @@ double toJulianDate(time_point tp);
 double gmst(double julianDate);
 Vec3 eciToECEF(const Vec3 &eci, double gst);
 Geodetic ecefToGeodetic(const Vec3 &ecef);
+
+void loadTLEDatabase(std::istream &s, std::map<int, Orbit> &database);
+void loadTLEDatabase(const std::string &filepath, std::map<int, Orbit> &database);
+void saveTLEDatabase(std::ostream &s, const std::map<int, Orbit> &database);
+void saveTLEDatabase(const std::string &filepath, const std::map<int, Orbit> &database);
+
+// TLE formatting utilities
+int calculateChecksum(const std::string& line);
+std::string toTLEExponential(double value);
+std::string formatFirstDerivative(double value);
 
 }
 

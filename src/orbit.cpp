@@ -12,6 +12,7 @@
 #include <ranges>
 #include <string>
 #include <string_view>
+#include <fstream>
 
 #include <date/date.h>
 
@@ -427,7 +428,6 @@ int Orbit::getRevolutionNumberAtEpoch() const {
     return revolutionNumberAtEpoch;
 }
 
-
 std::string Orbit::getName() const {
     return name;
 }
@@ -451,6 +451,238 @@ void Orbit::printInfo(std::ostream &os) const {
     os << "  Mean Motion: " << getMeanMotion() << " revs per day" << std::endl;
     os << "  Revolution Number at Epoch: " << getRevolutionNumberAtEpoch() << std::endl;
     os << std::endl;
+}
+
+// Calculate TLE line checksum (mod 10 sum of digits, with '-' counting as 1)
+int calculateChecksum(const std::string& line) {
+    int sum = 0;
+    for (char c : line) {
+        if (c >= '0' && c <= '9') {
+            sum += (c - '0');
+        } else if (c == '-') {
+            sum += 1;
+        }
+    }
+    return sum % 10;
+}
+
+// Format a value in TLE exponential notation (e.g., " 00000+0" or " 15237-3" or "-12345-6")
+// The format is: [sign]NNNNN[sign]E where NNNNN is 5 digits of mantissa and E is exponent
+std::string toTLEExponential(double value) {
+    if (value == 0.0) {
+        return " 00000+0";
+    }
+
+    char sign = (value >= 0) ? ' ' : '-';
+    value = std::abs(value);
+
+    // Get exponent (power of 10)
+    int exponent = static_cast<int>(std::floor(std::log10(value)));
+
+    // Normalize mantissa to be in range [0.1, 1.0)
+    double mantissa = value / std::pow(10.0, exponent + 1);
+
+    // Convert mantissa to 5-digit integer
+    int mantissaInt = static_cast<int>(std::round(mantissa * 100000));
+
+    // Handle rounding overflow
+    if (mantissaInt >= 100000) {
+        mantissaInt = 10000;
+        exponent++;
+    }
+
+    // Format exponent with sign
+    char expSign = (exponent + 1 >= 0) ? '+' : '-';
+    int expAbs = std::abs(exponent + 1);
+
+    std::ostringstream ss;
+    ss << sign << std::setw(5) << std::setfill('0') << mantissaInt << expSign << expAbs;
+    return ss.str();
+}
+
+// Format first derivative of mean motion for TLE (e.g., " .00008010" or "-.00012345")
+std::string formatFirstDerivative(double value) {
+    char sign = (value >= 0) ? ' ' : '-';
+    value = std::abs(value);
+
+    std::ostringstream ss;
+    ss << sign << '.' << std::setw(8) << std::setfill('0')
+       << static_cast<int>(std::round(value * 100000000));
+    return ss.str();
+}
+
+// Get standard 3-line TLE representation of the orbital elements
+std::string Orbit::getTLE() const {
+    using namespace std::chrono;
+
+    std::ostringstream tleStream;
+
+    // Line 0: Name
+    tleStream << name << '\n';
+
+    // Line 1
+    // Compute epoch in TLE format: YYDDD.DDDDDDDD
+    auto epochDays = floor<days>(epoch);
+    year_month_day ymd{epochDays};
+    int year = static_cast<int>(ymd.year());
+    int twoDigitYear = year % 100;
+
+    // Day of year (1-366)
+    auto yearStart = sys_days{ymd.year()/January/1};
+    int dayOfYear = (epochDays - yearStart).count() + 1;
+
+    // Fractional part of day
+    auto timeOfDay = epoch - epochDays;
+    double fracDay = duration_cast<duration<double, std::ratio<86400>>>(timeOfDay).count();
+
+    // Format epoch string (14 chars: YYDDD.DDDDDDDD)
+    std::ostringstream epochStr;
+    epochStr << std::setw(2) << std::setfill('0') << twoDigitYear
+             << std::setw(3) << std::setfill('0') << dayOfYear
+             << '.' << std::setw(8) << std::setfill('0')
+             << static_cast<long>(std::round(fracDay * 100000000));
+
+    // Build line 1 without checksum (68 chars), then add checksum
+    // TLE Line 1 format (columns 1-indexed):
+    // Col 01: Line number (1)
+    // Col 02: Space
+    // Col 03-07: NORAD Catalog Number (5 digits)
+    // Col 08: Classification (U/C/S)
+    // Col 09: Space
+    // Col 10-17: International Designator (8 chars, left-justified, space-padded)
+    // Col 18: Space
+    // Col 19-32: Epoch (14 chars: YYDDD.DDDDDDDD)
+    // Col 33: Space
+    // Col 34-43: First Derivative Mean Motion (10 chars: sX.XXXXXXXX)
+    // Col 44: Space
+    // Col 45-52: Second Derivative Mean Motion (8 chars: sNNNNNsE)
+    // Col 53: Space
+    // Col 54-61: BSTAR (8 chars: sNNNNNsE)
+    // Col 62: Space
+    // Col 63: Ephemeris Type (always 0)
+    // Col 64: Space
+    // Col 65-68: Element Set Number (4 digits, right-justified, space-padded)
+    // Col 69: Checksum
+    std::ostringstream line1;
+    line1 << "1 "
+          << std::setw(5) << std::setfill('0') << noradID
+          << classification << ' '
+          << std::left << std::setw(8) << std::setfill(' ') << designator << ' '
+          << epochStr.str() << ' '
+          << formatFirstDerivative(firstDerivativeMeanMotion) << ' '
+          << toTLEExponential(secondDerivativeMeanMotion) << ' '
+          << toTLEExponential(bstarDragTerm) << ' '
+          << "0 "
+          << std::right << std::setw(4) << std::setfill(' ') << (elementSetNumber % 10000);
+
+    std::string line1Str = line1.str();
+    int checksum1 = calculateChecksum(line1Str);
+    tleStream << line1Str << checksum1 << '\n';
+
+    // Build line 2 without checksum (68 chars), then add checksum
+    // TLE Line 2 format (columns 1-indexed):
+    // Col 01: Line number (2)
+    // Col 02: Space
+    // Col 03-07: NORAD Catalog Number (5 digits)
+    // Col 08: Space
+    // Col 09-16: Inclination (8 chars: XXX.XXXX)
+    // Col 17: Space
+    // Col 18-25: RAAN (8 chars: XXX.XXXX)
+    // Col 26: Space
+    // Col 27-33: Eccentricity (7 digits, implied decimal)
+    // Col 34: Space
+    // Col 35-42: Argument of Perigee (8 chars: XXX.XXXX)
+    // Col 43: Space
+    // Col 44-51: Mean Anomaly (8 chars: XXX.XXXX)
+    // Col 52: Space
+    // Col 53-63: Mean Motion (11 chars: XX.XXXXXXXX)
+    // Col 64-68: Revolution Number at Epoch (5 digits)
+    // Col 69: Checksum
+    int eccInt = static_cast<int>(std::round(eccentricity * 10000000));
+
+    std::ostringstream line2;
+    line2 << "2 "
+          << std::setw(5) << std::setfill('0') << noradID << ' '
+          << std::right << std::setw(8) << std::setfill(' ')
+          << std::fixed << std::setprecision(4) << inclination << ' '
+          << std::right << std::setw(8) << std::setfill(' ')
+          << std::fixed << std::setprecision(4) << rightAscensionOfAscendingNode << ' '
+          << std::setw(7) << std::setfill('0') << eccInt << ' '
+          << std::right << std::setw(8) << std::setfill(' ')
+          << std::fixed << std::setprecision(4) << argumentOfPerigee << ' '
+          << std::right << std::setw(8) << std::setfill(' ')
+          << std::fixed << std::setprecision(4) << meanAnomaly << ' '
+          << std::right << std::setw(11) << std::setfill(' ')
+          << std::fixed << std::setprecision(8) << meanMotion
+          << std::setw(5) << std::setfill('0') << (revolutionNumberAtEpoch % 100000);
+
+    std::string line2Str = line2.str();
+    int checksum2 = calculateChecksum(line2Str);
+    tleStream << line2Str << checksum2 << '\n';
+
+    return tleStream.str();
+}
+
+// Load TLE database from file using the standard 3-line TLE format
+void loadTLEDatabase(const std::string &filepath, std::map<int, Orbit> &database) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        throw std::runtime_error("Failed to open TLE database file: " + filepath);
+    }
+    loadTLEDatabase(file, database);
+}
+
+// Load TLE database from stream using the standard 3-line TLE format
+void loadTLEDatabase(std::istream &s, std::map<int, Orbit> &database) {
+    bool haveFirstLine = false;
+    bool haveSecondLine = false;
+    std::string line, line1, line2, nameLine;
+    while (std::getline(s, line)) {
+        if (line.empty()) continue;
+
+        if (line.starts_with("1 ")) {
+            line1 = line;
+            haveFirstLine = true;
+        } else if (line.starts_with("2 ")) {
+            line2 = line;
+            haveSecondLine = true;
+        } else {
+            nameLine = line; // Assume it's the name
+        }
+
+        if (haveFirstLine && haveSecondLine) {
+            Orbit orbit;
+
+            std::ostringstream tleStream;
+            tleStream << nameLine << '\n' << line1 << '\n' << line2 << '\n';
+
+            orbit.updateFromTLE(tleStream.str());
+
+            database[orbit.getNoradID()] = orbit;
+
+            haveFirstLine = false;
+            haveSecondLine = false;
+            line1.clear();
+            line2.clear();
+            nameLine.clear();
+        }
+    }
+}
+
+// Save TLE database to file using the standard 3-line TLE format
+void saveTLEDatabase(const std::string &filepath, const std::map<int, Orbit> &database) {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        throw std::runtime_error("Failed to open file for writing: " + filepath);
+    }
+    saveTLEDatabase(file, database);
+}
+
+// Save TLE database to stream using the standard 3-line TLE format
+void saveTLEDatabase(std::ostream &s, const std::map<int, Orbit> &database) {
+    for (const auto &[id, orbit] : database) {
+        s << orbit.getTLE();
+    }
 }
 
 } // namespace sattrack

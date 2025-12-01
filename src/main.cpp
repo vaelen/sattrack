@@ -14,6 +14,7 @@
 #include <sstream>
 #include <vector>
 #include <algorithm>
+#include <map>
 
 namespace fs = std::filesystem;
 
@@ -123,7 +124,6 @@ void printPasses(sattrack::Config &config) {
         std::exit(1);
     }
 }
-
 
 /** Program entry point */
 int main(int argc, char* argv[]) {
