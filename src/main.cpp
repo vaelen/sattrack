@@ -5,10 +5,13 @@
 
 #include <sattrack.hpp>
 #include <CLI/CLI.hpp>
+#include <date/date.h>
 #include <filesystem>
 #include <fstream>
 #include <format>
 #include <chrono>
+#include <iomanip>
+#include <sstream>
 #include <vector>
 #include <algorithm>
 
@@ -25,36 +28,27 @@ std::string expandTilde(const std::string &path) {
     return path;
 }
 
-std::string formatTimestamp(const long timestamp) {
+std::string formatTimestampUTC(const long timestamp) {
     auto timePoint = std::chrono::system_clock::time_point(
         std::chrono::seconds(timestamp)
     );
-    // Explicitly truncate to seconds
     auto truncated = std::chrono::floor<std::chrono::seconds>(timePoint);
-    auto localTime = std::chrono::zoned_time{
-        std::chrono::current_zone(), truncated
-    };
-    return std::format("{:%F %T %Z}", localTime);
+    return date::format("%F %T UTC", truncated);
 }
 
-std::chrono::zoned_seconds toLocalTime(const long timestamp) {
-    auto timePoint = std::chrono::system_clock::time_point(
+std::chrono::system_clock::time_point toTimePoint(const long timestamp) {
+    return std::chrono::system_clock::time_point(
         std::chrono::seconds(timestamp)
     );
-    // Explicitly truncate to seconds
-    auto truncated = std::chrono::floor<std::chrono::seconds>(timePoint);
-    return std::chrono::zoned_time{
-        std::chrono::current_zone(), truncated
-    };
 }
 
 void printPasses(sattrack::Config &config) {
     try {
         constexpr std::string_view rowFormat = "{:^25} {:^25} {:^25} {:^14} {:^18} {:^12} {:^12} {:^12} {:^10}";
         constexpr std::string_view satFormat = " {:<5} {:<17}";
-        constexpr std::string_view timeFormat = "{:%F %T %Z}";
-        constexpr std::string_view durationFormat = "{:>6%Q %q} {:>4%Q %q}";
-        constexpr std::string_view etaFormat = "{:>4%Q %q} {:>6%Q %q} {:>4%Q %q}";
+        constexpr const char* timeFormat = "%F %T UTC";
+        constexpr std::string_view durationFormat = "{:>3}m {:>2}s";
+        constexpr std::string_view etaFormat = "{:>2}h {:>2}m {:>2}s";
         constexpr std::string_view azFormat = "{:>6.2f} {:<3}";
         constexpr std::string_view elFormat = "{:<5.2f}";
 
@@ -97,23 +91,25 @@ void printPasses(sattrack::Config &config) {
             auto info = wrapper.info;
             auto pass = wrapper.pass;
             // Calculate all our times and durations
-            auto startTime = toLocalTime(pass.startUTC);
-            auto endTime = toLocalTime(pass.endUTC);
+            auto startTime = toTimePoint(pass.startUTC);
+            auto endTime = toTimePoint(pass.endUTC);
             auto duration = std::chrono::seconds(pass.endUTC - pass.startUTC);
-            auto durationMins = std::chrono::duration_cast<std::chrono::minutes>(duration);
-            auto durationSecs = std::chrono::duration_cast<std::chrono::seconds>(duration % std::chrono::minutes(1));
+            auto durationMins = std::chrono::duration_cast<std::chrono::minutes>(duration).count();
+            auto durationSecs = std::chrono::duration_cast<std::chrono::seconds>(duration % std::chrono::minutes(1)).count();
             auto now = std::chrono::system_clock::now();
-            auto nowSeconds = duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
+            auto nowSeconds = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
             auto eta = std::chrono::seconds(pass.startUTC - nowSeconds);
-            auto etaHours = std::chrono::duration_cast<std::chrono::hours>(eta);
-            auto etaMins = std::chrono::duration_cast<std::chrono::minutes>(eta % std::chrono::hours(1));
-            auto etaSecs = std::chrono::duration_cast<std::chrono::seconds>(eta % std::chrono::minutes(1));
+            auto etaHours = std::chrono::duration_cast<std::chrono::hours>(eta).count();
+            auto etaMins = std::chrono::duration_cast<std::chrono::minutes>(eta % std::chrono::hours(1)).count();
+            auto etaSecs = std::chrono::duration_cast<std::chrono::seconds>(eta % std::chrono::minutes(1)).count();
 
             // Output the pass data
-            std::cout << std::format(rowFormat, 
+            auto startTimeSeconds = std::chrono::floor<std::chrono::seconds>(startTime);
+            auto endTimeSeconds = std::chrono::floor<std::chrono::seconds>(endTime);
+            std::cout << std::format(rowFormat,
                 std::format(satFormat, info.id, info.name),
-                std::format(timeFormat, startTime),
-                std::format(timeFormat, endTime),
+                date::format(timeFormat, startTimeSeconds),
+                date::format(timeFormat, endTimeSeconds),
                 std::format(durationFormat, durationMins, durationSecs),
                 std::format(etaFormat, etaHours, etaMins, etaSecs),
                 std::format(azFormat, pass.startAz, pass.startAzCompass),
@@ -195,6 +191,23 @@ int main(int argc, char* argv[]) {
         [&config](const int elev) { config.setMinimumElevation(elev); },
         "Minimum pass elevation above the horizon in degrees (default 10, max 90)");
 
+    auto geoCommand = app.add_subcommand("geo", "Get geodetic location (lat/long/alt) of the satellite at given time");
+    geoCommand->add_option_function<int>("id", 
+        [&config](const int id) { config.addSatellite(id); },
+        "Norad ID of satellite to track");
+    geoCommand->add_option_function<std::string>("time",
+        [&config](const std::string &timeStr) {
+            // Parse time string into time_point using date.h
+            std::istringstream in(timeStr);
+            std::chrono::system_clock::time_point tp;
+            in >> date::parse("%Y-%m-%d %H:%M:%S", tp);
+            if (in.fail()) {
+                throw std::invalid_argument("Invalid time format (expected YYYY-MM-DD HH:MM:SS UTC): " + timeStr);
+            }
+            config.setTime(tp);
+        }
+    );
+
     app.parse_complete_callback(
         [&config, &ids](void) {
             if (!config.hasAPIKey()) {
@@ -240,8 +253,8 @@ int main(int argc, char* argv[]) {
                 std::cout << "  NORAD ID: " << orbit.getNoradID() << std::endl;
                 std::cout << "  Classification: " << orbit.getClassification() << std::endl;
                 std::cout << "  Designator: " << orbit.getDesignator() << std::endl;
-                auto epoch = orbit.getEpoch();
-                std::cout << "  Epoch: " << std::format("{:%F %T %Z}", std::chrono::zoned_time{"UTC", epoch}) << std::endl;
+                auto epoch = std::chrono::floor<std::chrono::seconds>(orbit.getEpoch());
+                std::cout << "  Epoch: " << date::format("%F %T UTC", epoch) << std::endl;
                 std::cout << "  First Derivative of Mean Motion: " << orbit.getFirstDerivativeMeanMotion() << std::endl;
                 std::cout << "  Second Derivative of Mean Motion: " << orbit.getSecondDerivativeMeanMotion() << std::endl;
                 std::cout << "  Bstar Drag Term: " << orbit.getBstarDragTerm() << std::endl;

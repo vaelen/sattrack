@@ -68,6 +68,8 @@ public:
     double getTrueAnomalyFromEccentricAnomaly(double eccentricAnomalyInRadians) const;
     double getTrueAnomalyAtTime(const double julianDate) const;
     Vec3 getECI(double trueAnomalyInRadians) const;
+    Geodetic getGeodeticLocationAtTime(const time_point tp) const;
+    Geodetic getGeodeticLocationAtTime(const double julianDate) const;
 private:
 // First Line - Satellite Identification
     int noradID;

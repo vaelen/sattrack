@@ -9,8 +9,11 @@
 #include <string>
 #include <set>
 #include <optional>
+#include <chrono>
 
 namespace sattrack {
+
+using time_point = std::chrono::system_clock::time_point;
 
 class Config {
 public:
@@ -58,6 +61,9 @@ public:
     bool getVerbose();
     void setVerbose(bool);
 
+    time_point getTime();
+    void setTime(const time_point tp);
+
 private:
     std::optional<std::string> apiKey;
     double longitude;
@@ -67,6 +73,7 @@ private:
     int days;
     int minimumElevation;
     bool verbose;
+    time_point time;
 };
 
 }

@@ -131,4 +131,12 @@ void Config::setVerbose(bool v) {
     verbose = v;
 }
 
+time_point Config::getTime() {
+    return time;
+}
+
+void Config::setTime(const time_point tp) {
+    time = tp;
+}
+
 }

@@ -122,43 +122,6 @@ double gmst(double julianDate) {
     return gmstInDegrees * DEGREES_TO_RADIANS;
 }
 
-// Convert Earth Centered Inertial (ECI) to Earth Centered Earth Fixed (ECEF) using Greenwich Sidereal Time
-Vec3 eciToECEF(const Vec3 &eci, double gst) {
-    double cosGST = std::cos(gst);
-    double sinGST = std::sin(gst);
-    
-    return {
-         eci.x * cosGST + eci.y * sinGST,
-        -eci.x * sinGST + eci.y * cosGST,
-         eci.z
-    };
-}
-
-// Convert ECEF coordinates to geodetic latitude, longitude, and altitude
-Geodetic ecefToGeodetic(const Vec3 &ecef) {
-    constexpr double a = 6378.137;            // WGS84 semi-major axis (km)
-    constexpr double f = 1.0 / 298.257223563; // flattening
-    constexpr double e2 = f * (2 - f);        // eccentricity squared
-    
-    double x = ecef.x, y = ecef.y, z = ecef.z;
-    double lon = std::atan2(y, x);
-    double p = std::sqrt(x*x + y*y);
-    
-    // Iterative latitude calculation (Bowring's method)
-    double lat = std::atan2(z, p * (1 - e2));  // initial guess
-    for (int i = 0; i < 10; ++i) {
-        double sinLat = std::sin(lat);
-        double N = a / std::sqrt(1 - e2 * sinLat * sinLat);
-        lat = std::atan2(z + e2 * N * sinLat, p);
-    }
-    
-    double sinLat = std::sin(lat);
-    double N = a / std::sqrt(1 - e2 * sinLat * sinLat);
-    double alt = p / std::cos(lat) - N;
-    
-    return {lat, lon, alt};
-}
-
 double Orbit::getMeanAnomalyAtTime(const double julianDate) const {
     constexpr double secondsPerDay = 86400.0;
     
@@ -277,6 +240,66 @@ Vec3 Orbit::getECI(double trueAnomalyInRadians) const {
     };
 }
 
+// Convert Earth Centered Inertial (ECI) to Earth Centered Earth Fixed (ECEF) using Greenwich Sidereal Time
+Vec3 eciToECEF(const Vec3 &eci, double gst) {
+    double cosGST = std::cos(gst);
+    double sinGST = std::sin(gst);
+    
+    return {
+         eci.x * cosGST + eci.y * sinGST,
+        -eci.x * sinGST + eci.y * cosGST,
+         eci.z
+    };
+}
+
+// Convert ECEF coordinates to geodetic latitude, longitude, and altitude
+Geodetic ecefToGeodetic(const Vec3 &ecef) {
+    constexpr double a = 6378.137;            // WGS84 semi-major axis (km)
+    constexpr double f = 1.0 / 298.257223563; // flattening
+    constexpr double e2 = f * (2 - f);        // eccentricity squared
+    
+    double x = ecef.x, y = ecef.y, z = ecef.z;
+    double lon = std::atan2(y, x);
+    double p = std::sqrt(x*x + y*y);
+    
+    // Iterative latitude calculation (Bowring's method)
+    double lat = std::atan2(z, p * (1 - e2));  // initial guess
+    for (int i = 0; i < 10; ++i) {
+        double sinLat = std::sin(lat);
+        double N = a / std::sqrt(1 - e2 * sinLat * sinLat);
+        lat = std::atan2(z + e2 * N * sinLat, p);
+    }
+    
+    double sinLat = std::sin(lat);
+    double N = a / std::sqrt(1 - e2 * sinLat * sinLat);
+    double alt = p / std::cos(lat) - N;
+    
+    return {lat, lon, alt};
+}
+
+// Get geodetic location (lat, lon, alt) of the satellite at a given time
+Geodetic Orbit::getGeodeticLocationAtTime(const time_point tp) const {
+    double julianDate = toJulianDate(tp);
+    return getGeodeticLocationAtTime(julianDate);
+}   
+
+// Get geodetic location (lat, lon, alt) of the satellite at a given time
+Geodetic Orbit::getGeodeticLocationAtTime(const double julianDate) const {
+    // Get true anomaly at the requested time
+    double trueAnomaly = getTrueAnomalyAtTime(julianDate);
+
+    // Get ECI coordinates (the satellite's position in inertial frame)
+    Vec3 eci = getECI(trueAnomaly);
+    
+    // Get GMST at the requested time (the earth's rotation angle)
+    double gst = gmst(julianDate);
+
+    // Convert ECI to ECEF (the satellite's position in earth-fixed frame)
+    Vec3 ecef = eciToECEF(eci, gst);
+    
+    // Convert ECEF to geodetic coordinates (latitude/longitude/altitude)
+    return ecefToGeodetic(ecef);
+}
 
 // Update orbital elements from TLE data
 void Orbit::updateFromTLE(const std::string_view &tle) {
