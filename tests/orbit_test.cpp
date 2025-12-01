@@ -8,6 +8,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <sstream>
 #include <string>
 
 namespace sattrack {
@@ -40,6 +41,7 @@ TEST_F(OrbitTest, DefaultConstruction) {
     // Default constructed orbit has uninitialized numeric members
     // but string should be empty (std::string default constructor)
     EXPECT_TRUE(defaultOrbit.getDesignator().empty());
+    EXPECT_TRUE(defaultOrbit.getName().empty());
 }
 
 // Test parsing ISS TLE - Line 1 fields
@@ -144,6 +146,48 @@ TEST_F(OrbitTest, ParseThreeLineFormat) {
     orbit.updateFromTLE(TLE_WITH_NAME);
     EXPECT_EQ(orbit.getNoradID(), 25544);
     EXPECT_DOUBLE_EQ(orbit.getInclination(), 51.6312);
+}
+
+// ============================================================================
+// Name Parsing Tests
+// ============================================================================
+
+TEST_F(OrbitTest, GetName_TwoLineFormat) {
+    // Two-line TLE format should result in empty name
+    orbit.updateFromTLE(ISS_TLE);
+    EXPECT_TRUE(orbit.getName().empty());
+}
+
+TEST_F(OrbitTest, GetName_ThreeLineFormat) {
+    // Three-line TLE format should parse the name from the first line
+    orbit.updateFromTLE(TLE_WITH_NAME);
+    EXPECT_EQ(orbit.getName(), "ISS (ZARYA)");
+}
+
+TEST_F(OrbitTest, UpdateFromTLE_WithExplicitName) {
+    // Using the overload that accepts a separate name
+    orbit.updateFromTLE("My Custom Name", ISS_TLE);
+    EXPECT_EQ(orbit.getName(), "My Custom Name");
+    // Should still parse the orbital elements correctly
+    EXPECT_EQ(orbit.getNoradID(), 25544);
+    EXPECT_DOUBLE_EQ(orbit.getInclination(), 51.6312);
+}
+
+TEST_F(OrbitTest, UpdateFromTLE_ExplicitNameOverridesEmbeddedName) {
+    // When using the overload with explicit name, it should override
+    // any name that might be embedded in the TLE
+    orbit.updateFromTLE("Override Name", TLE_WITH_NAME);
+    EXPECT_EQ(orbit.getName(), "Override Name");
+}
+
+TEST_F(OrbitTest, GetName_TrimsWhitespace) {
+    // Test that leading/trailing whitespace is trimmed from name
+    constexpr const char* TLE_WITH_PADDED_NAME =
+        "  NOAA 19  \n"
+        "1 33591U 09005A   25333.78204194  .00000054  00000+0  52635-4 0  9999\n"
+        "2 33591  98.9785  39.2910 0013037 231.6546 128.3455 14.13431889866318";
+    orbit.updateFromTLE(TLE_WITH_PADDED_NAME);
+    EXPECT_EQ(orbit.getName(), "NOAA 19");
 }
 
 // Test epoch parsing
@@ -538,6 +582,70 @@ TEST_F(OrbitTest, ECIInclinationConsistent) {
     double sinI = eci.z / r;
     double expectedSinI = std::sin(51.6312 * M_PI / 180.0);
     EXPECT_NEAR(std::abs(sinI), expectedSinI, 0.01);
+}
+
+// ============================================================================
+// printInfo Tests
+// ============================================================================
+
+TEST_F(OrbitTest, PrintInfo_ContainsSatelliteName) {
+    orbit.updateFromTLE(TLE_WITH_NAME);
+    std::ostringstream oss;
+    orbit.printInfo(oss);
+    std::string output = oss.str();
+    EXPECT_NE(output.find("ISS (ZARYA)"), std::string::npos);
+}
+
+TEST_F(OrbitTest, PrintInfo_ContainsNoradID) {
+    orbit.updateFromTLE(ISS_TLE);
+    std::ostringstream oss;
+    orbit.printInfo(oss);
+    std::string output = oss.str();
+    EXPECT_NE(output.find("NORAD ID: 25544"), std::string::npos);
+}
+
+TEST_F(OrbitTest, PrintInfo_ContainsOrbitalElements) {
+    orbit.updateFromTLE(ISS_TLE);
+    std::ostringstream oss;
+    orbit.printInfo(oss);
+    std::string output = oss.str();
+
+    // Check for key orbital element labels
+    EXPECT_NE(output.find("Inclination:"), std::string::npos);
+    EXPECT_NE(output.find("Eccentricity:"), std::string::npos);
+    EXPECT_NE(output.find("Mean Motion:"), std::string::npos);
+    EXPECT_NE(output.find("Mean Anomaly:"), std::string::npos);
+    EXPECT_NE(output.find("Argument of Perigee:"), std::string::npos);
+    EXPECT_NE(output.find("Right Ascension of Ascending Node:"), std::string::npos);
+}
+
+TEST_F(OrbitTest, PrintInfo_ContainsEpoch) {
+    orbit.updateFromTLE(ISS_TLE);
+    std::ostringstream oss;
+    orbit.printInfo(oss);
+    std::string output = oss.str();
+
+    // Check that epoch is present and contains UTC
+    EXPECT_NE(output.find("Epoch:"), std::string::npos);
+    EXPECT_NE(output.find("UTC"), std::string::npos);
+}
+
+TEST_F(OrbitTest, PrintInfo_ContainsDragTerms) {
+    orbit.updateFromTLE(ISS_TLE);
+    std::ostringstream oss;
+    orbit.printInfo(oss);
+    std::string output = oss.str();
+
+    EXPECT_NE(output.find("First Derivative of Mean Motion:"), std::string::npos);
+    EXPECT_NE(output.find("Second Derivative of Mean Motion:"), std::string::npos);
+    EXPECT_NE(output.find("Bstar Drag Term:"), std::string::npos);
+}
+
+TEST_F(OrbitTest, PrintInfo_OutputIsNotEmpty) {
+    orbit.updateFromTLE(ISS_TLE);
+    std::ostringstream oss;
+    orbit.printInfo(oss);
+    EXPECT_FALSE(oss.str().empty());
 }
 
 }  // namespace

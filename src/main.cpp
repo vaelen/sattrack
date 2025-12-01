@@ -247,26 +247,9 @@ int main(int argc, char* argv[]) {
         try {
             for (auto noradID : config.getSatellites()) {
                 auto response = n2yo::getTLE(config.getAPIKey(), noradID, config.getVerbose());
-                std::cout << response.info.name << std::endl;
                 sattrack::Orbit orbit;
-                orbit.updateFromTLE(response.tle);
-                std::cout << "  NORAD ID: " << orbit.getNoradID() << std::endl;
-                std::cout << "  Classification: " << orbit.getClassification() << std::endl;
-                std::cout << "  Designator: " << orbit.getDesignator() << std::endl;
-                auto epoch = std::chrono::floor<std::chrono::seconds>(orbit.getEpoch());
-                std::cout << "  Epoch: " << date::format("%F %T UTC", epoch) << std::endl;
-                std::cout << "  First Derivative of Mean Motion: " << orbit.getFirstDerivativeMeanMotion() << std::endl;
-                std::cout << "  Second Derivative of Mean Motion: " << orbit.getSecondDerivativeMeanMotion() << std::endl;
-                std::cout << "  Bstar Drag Term: " << orbit.getBstarDragTerm() << std::endl;
-                std::cout << "  Element Set Number: " << orbit.getElementSetNumber() << std::endl;
-                std::cout << "  Inclination: " << orbit.getInclination() << " deg" << std::endl;
-                std::cout << "  Right Ascension of Ascending Node: " << orbit.getRightAscensionOfAscendingNode() << " deg" << std::endl;
-                std::cout << "  Eccentricity: " << orbit.getEccentricity() << std::endl;
-                std::cout << "  Argument of Perigee: " << orbit.getArgumentOfPerigee() << " deg" << std::endl;
-                std::cout << "  Mean Anomaly: " << orbit.getMeanAnomaly() << " deg" << std::endl;
-                std::cout << "  Mean Motion: " << orbit.getMeanMotion() << " revs per day" << std::endl;
-                std::cout << "  Revolution Number at Epoch: " << orbit.getRevolutionNumberAtEpoch() << std::endl;
-                std::cout << std::endl;
+                orbit.updateFromTLE(response.info.name, response.tle);
+                orbit.printInfo(std::cout);
             }
         } catch (const std::exception &err) {
             std::cerr << err.what() << std::endl;

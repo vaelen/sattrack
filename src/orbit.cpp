@@ -13,6 +13,8 @@
 #include <string>
 #include <string_view>
 
+#include <date/date.h>
+
 namespace sattrack {
 
 // Astronomical constants
@@ -33,6 +35,12 @@ constexpr double DEGREES_TO_RADIANS = std::numbers::pi / 180.0;
 std::string_view trimLeft(const std::string_view &str) {
     auto pos = str.find_first_not_of(' ');
     return pos == std::string_view::npos ? "" : str.substr(pos);
+}
+
+// Helper function to trim trailing spaces from a string_view
+std::string_view trimRight(const std::string_view &str) {
+    auto pos = str.find_last_not_of(' ');
+    return pos == std::string_view::npos ? "" : str.substr(0, pos + 1);
 }
 
 // Helper function to convert substring to numeric type
@@ -301,12 +309,19 @@ Geodetic Orbit::getGeodeticLocationAtTime(const double julianDate) const {
     return ecefToGeodetic(ecef);
 }
 
+// Update orbital elements from TLE data with a seperate name
+void Orbit::updateFromTLE(const std::string_view &name, const std::string_view &tle) {
+    updateFromTLE(tle);
+    this->name = std::string(name);
+}
+
 // Update orbital elements from TLE data
 void Orbit::updateFromTLE(const std::string_view &tle) {
     bool firstLineParsed = false;
     bool secondLineParsed = false;
     for (auto line : tle | std::views::split('\n')) {
         std::string_view lineView(line.begin(), line.end());
+        lineView = trimLeft(trimRight(lineView));
         if (lineView.starts_with("1 ")) {
             // NORAD ID is columns 3-7
             noradID = toNumber<int>(trimLeft(lineView.substr(2, 5)));
@@ -341,7 +356,11 @@ void Orbit::updateFromTLE(const std::string_view &tle) {
             // Revolution number at epoch is columns 64-68
             revolutionNumberAtEpoch = toNumber<int>(trimLeft(lineView.substr(63, 5)));
             secondLineParsed = true;
+        } else if (!firstLineParsed && !secondLineParsed && !lineView.empty()) {
+            // If neither line has been parsed and this line is not empty, assume it's the name
+            name = std::string(lineView);
         }
+
         if (firstLineParsed && secondLineParsed) {
             break;
         }
@@ -406,6 +425,32 @@ double Orbit::getMeanMotion() const {
 
 int Orbit::getRevolutionNumberAtEpoch() const {
     return revolutionNumberAtEpoch;
+}
+
+
+std::string Orbit::getName() const {
+    return name;
+}
+
+void Orbit::printInfo(std::ostream &os) const {
+    os << getName() << std::endl;
+    os << "  NORAD ID: " << getNoradID() << std::endl;
+    os << "  Classification: " << getClassification() << std::endl;
+    os << "  Designator: " << getDesignator() << std::endl;
+    auto epoch = std::chrono::floor<std::chrono::seconds>(getEpoch());
+    os << "  Epoch: " << date::format("%F %T UTC", epoch) << std::endl;
+    os << "  First Derivative of Mean Motion: " << getFirstDerivativeMeanMotion() << std::endl;
+    os << "  Second Derivative of Mean Motion: " << getSecondDerivativeMeanMotion() << std::endl;
+    os << "  Bstar Drag Term: " << getBstarDragTerm() << std::endl;
+    os << "  Element Set Number: " << getElementSetNumber() << std::endl;
+    os << "  Inclination: " << getInclination() << " deg" << std::endl;
+    os << "  Right Ascension of Ascending Node: " << getRightAscensionOfAscendingNode() << " deg" << std::endl;
+    os << "  Eccentricity: " << getEccentricity() << std::endl;
+    os << "  Argument of Perigee: " << getArgumentOfPerigee() << " deg" << std::endl;
+    os << "  Mean Anomaly: " << getMeanAnomaly() << " deg" << std::endl;
+    os << "  Mean Motion: " << getMeanMotion() << " revs per day" << std::endl;
+    os << "  Revolution Number at Epoch: " << getRevolutionNumberAtEpoch() << std::endl;
+    os << std::endl;
 }
 
 } // namespace sattrack

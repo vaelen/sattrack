@@ -44,8 +44,10 @@ public:
     Orbit() = default;
     ~Orbit() = default;
 
+    void updateFromTLE(const std::string_view &name, const std::string_view &tle);
     void updateFromTLE(const std::string_view &tle);
 
+    std::string getName() const;
     int getNoradID() const;
     char getClassification() const;
     std::string getDesignator() const;
@@ -70,7 +72,12 @@ public:
     Vec3 getECI(double trueAnomalyInRadians) const;
     Geodetic getGeodeticLocationAtTime(const time_point tp) const;
     Geodetic getGeodeticLocationAtTime(const double julianDate) const;
+
+    void printInfo(std::ostream &os) const;
 private:
+// Satellite Identification
+    std::string name;
+
 // First Line - Satellite Identification
     int noradID;
     char classification;
