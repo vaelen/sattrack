@@ -145,9 +145,6 @@ int main(int argc, char* argv[]) {
 
     std::vector<int> ids;
 
-    app.add_option_function<std::string>("--key",
-        [&config](const std::string &key) { config.setAPIKey(key); },
-        "N2YO API key");
     app.add_option("--id", ids, "Norad ID of satellite to track (can be listed more than once)");
     app.add_option_function<double>("--lat", 
         [&config](const double l) { config.setLatitude(l); },
@@ -165,31 +162,51 @@ int main(int argc, char* argv[]) {
     app.require_subcommand();
     app.ignore_case();
 
-    auto keyCommand = app.add_subcommand("key", "Set N2YO API key");
-    keyCommand->add_option_function<std::string>("key", 
-        [&config](const std::string &key) { config.setAPIKey(key); },
-        "N2YO API key");
-
     auto addCommand = app.add_subcommand("add", "Add satellite");
-    addCommand->add_option_function<int>("id", 
+    addCommand->add_option_function<int>("id",
         [&config](const int id) { config.addSatellite(id); },
         "Norad ID of satellite to start tracking");
 
     auto removeCommand = app.add_subcommand("remove", "Remove satellite");
-    removeCommand->add_option_function<int>("id", 
+    removeCommand->add_option_function<int>("id",
         [&config](const int id) { config.removeSatellite(id); },
         "Norad ID of satellite to stop tracking");
 
-    auto tleCommand = app.add_subcommand("tle", "Display TLE");
-    auto parseTLECommand = tleCommand->add_subcommand("parse", "Parse TLE and display orbital elements");
+    // n2yo command - access N2YO APIs
+    auto n2yoCommand = app.add_subcommand("n2yo", "Access N2YO APIs");
+    n2yoCommand->add_option_function<std::string>("--key",
+        [&config](const std::string &key) { config.setAPIKey(key); },
+        "N2YO API key");
 
-    auto passesCommand = app.add_subcommand("passes", "Display future passes");
-    passesCommand->add_option_function<int>("--days", 
+    auto n2yoKeyCommand = n2yoCommand->add_subcommand("key", "Set N2YO API key");
+    n2yoKeyCommand->add_option_function<std::string>("key",
+        [&config](const std::string &key) { config.setAPIKey(key); },
+        "N2YO API key");
+
+    auto n2yoTleCommand = n2yoCommand->add_subcommand("tle", "TLE operations");
+    auto n2yoTleViewCommand = n2yoTleCommand->add_subcommand("view", "Display TLE from N2YO");
+    auto n2yoTleParseCommand = n2yoTleCommand->add_subcommand("parse", "Parse TLE and display orbital elements");
+
+    auto n2yoUpdateCommand = n2yoCommand->add_subcommand("update", "Update local TLE from N2YO");
+
+    auto n2yoPassesCommand = n2yoCommand->add_subcommand("passes", "Display future passes");
+    n2yoPassesCommand->add_option_function<int>("--days",
         [&config](const int days) { config.setDays(days); },
         "Number of days worth of passes to display (default 1, max 10)");
-    passesCommand->add_option_function<int>("--elev", 
+    n2yoPassesCommand->add_option_function<int>("--elev",
         [&config](const int elev) { config.setMinimumElevation(elev); },
         "Minimum pass elevation above the horizon in degrees (default 10, max 90)");
+
+    // celestrak command - access Celestrak APIs
+    auto celestrakCommand = app.add_subcommand("celestrak", "Access Celestrak APIs");
+    auto celestrakTleCommand = celestrakCommand->add_subcommand("tle", "TLE operations");
+    auto celestrakTleViewCommand = celestrakTleCommand->add_subcommand("view", "Display TLE from Celestrak");
+    auto celestrakTleUpdateCommand = celestrakTleCommand->add_subcommand("update", "Update local TLE from Celestrak");
+
+    // tle command - local TLE operations
+    auto tleCommand = app.add_subcommand("tle", "Local TLE operations");
+    auto tleViewCommand = tleCommand->add_subcommand("view", "View local TLE data");
+    auto tleUpdateCommand = tleCommand->add_subcommand("update", "Update local TLE data");
 
     auto geoCommand = app.add_subcommand("geo", "Get geodetic location (lat/long/alt) of the satellite at given time");
     geoCommand->add_option_function<int>("id", 
@@ -226,11 +243,7 @@ int main(int argc, char* argv[]) {
         }
     );
 
-    tleCommand->final_callback([&config, tleCommand](void) {
-        // Skip if a subcommand was invoked
-        if (!tleCommand->get_subcommands().empty()) {
-            return;
-        }
+    n2yoTleViewCommand->final_callback([&config](void) {
         try {
             for (auto noradID : config.getSatellites()) {
                 auto response = n2yo::getTLE(config.getAPIKey(), noradID, config.getVerbose());
@@ -243,7 +256,7 @@ int main(int argc, char* argv[]) {
         }
     });
 
-    parseTLECommand->final_callback([&config](void) {
+    n2yoTleParseCommand->final_callback([&config](void) {
         try {
             for (auto noradID : config.getSatellites()) {
                 auto response = n2yo::getTLE(config.getAPIKey(), noradID, config.getVerbose());
@@ -257,8 +270,37 @@ int main(int argc, char* argv[]) {
         }
     });
 
-    passesCommand->final_callback([&config](void) {
+    n2yoUpdateCommand->final_callback([&config](void) {
+        try {
+            for (auto noradID : config.getSatellites()) {
+                auto response = n2yo::getTLE(config.getAPIKey(), noradID, config.getVerbose());
+                std::cout << response.info.name << std::endl;
+                std::cout << response.tle << std::endl << std::endl;
+            }
+        } catch (const std::exception &err) {
+            std::cerr << err.what() << std::endl;
+            std::exit(1);
+        }
+    });
+
+    n2yoPassesCommand->final_callback([&config](void) {
         printPasses(config);
+    });
+
+    celestrakTleViewCommand->final_callback([](void) {
+        // TODO: Implement Celestrak TLE view
+    });
+
+    celestrakTleUpdateCommand->final_callback([](void) {
+        // TODO: Implement Celestrak TLE update
+    });
+
+    tleViewCommand->final_callback([](void) {
+        // TODO: Implement local TLE view
+    });
+
+    tleUpdateCommand->final_callback([](void) {
+        // TODO: Implement local TLE update
     });
 
     geoCommand->final_callback([&config](void) {

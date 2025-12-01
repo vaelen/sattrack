@@ -23,6 +23,20 @@ target_link_libraries(orbit_test
     GTest::gtest_main
 )
 
+# Celestrak tests
+add_executable(celestrak_test
+    celestrak_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/celestrak.cpp
+)
+
+target_link_libraries(celestrak_test
+    GTest::gtest
+    GTest::gtest_main
+    ${CURL_LIBRARIES}
+    ${CURLPP_LIBRARIES}
+)
+
 # Register tests with CTest
 include(GoogleTest)
 gtest_discover_tests(orbit_test)
+gtest_discover_tests(celestrak_test)
