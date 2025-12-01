@@ -278,6 +278,26 @@ int main(int argc, char* argv[]) {
         printPasses(config);
     });
 
+    geoCommand->final_callback([&config](void) {
+        try {
+            for (auto noradID : config.getSatellites()) {
+                auto response = n2yo::getTLE(config.getAPIKey(), noradID, config.getVerbose());
+                sattrack::Orbit orbit;
+                orbit.updateFromTLE(response.tle);
+                double julianDate = sattrack::toJulianDate(config.getTime());
+                auto geo = orbit.getGeodeticLocationAtTime(julianDate);
+                std::cout << "Satellite: " << response.info.name << std::endl;
+                std::cout << "  Latitude: " << geo.latInRadians * (180.0 / M_PI) << " deg" << std::endl;
+                std::cout << "  Longitude: " << geo.lonInRadians * (180.0 / M_PI) << " deg" << std::endl;
+                std::cout << "  Altitude: " << geo.altInKilometers << " km" << std::endl;
+                std::cout << std::endl;
+            }
+        } catch (const std::exception &err) {
+            std::cerr << err.what() << std::endl;
+            std::exit(1);
+        }
+    });
+
     CLI11_PARSE(app, argc, argv);
 
     return 0;
