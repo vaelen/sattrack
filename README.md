@@ -46,24 +46,106 @@ alt = 30
 
 ## Usage
 
-If you have already set up your configuration file, you can simply run:
-```
-$ sattrack passes
+### Commands
+
+SatTrack provides the following commands:
+
+#### `passes` - Display future satellite passes
+
+Shows upcoming passes for all configured satellites, sorted by start time.
+
+Options:
+
+- `--days <n>` - Number of days worth of passes to display (default 1, max 10)
+- `--elev <n>` - Minimum pass elevation above the horizon in degrees (default 10, max 90)
+
+```sh
+sattrack passes
 
 Loading Passes............. Done.
 
 Upcoming Passes:
-        Satellite                   Start                      End               Duration        Starts In        Start Az      End Az       Max Az     Max Elev 
+        Satellite                   Start                      End               Duration        Starts In        Start Az      End Az       Max Az     Max Elev
 ------------------------- ------------------------- ------------------------- -------------- ------------------ ------------ ------------ ------------ ----------
- 27844 CUTE-1              2025-11-21 16:19:25 JST   2025-11-21 16:33:15 JST   13 min 50 s     0 h  4 min 28 s   135.66 SE      1.09 N      67.50 ENE    27.12   
- 28895 CUBESAT XI-V        2025-11-21 16:42:45 JST   2025-11-21 16:53:15 JST   10 min 30 s     0 h 27 min 48 s   348.77 N     241.77 WSW   294.94 WNW    12.84   
- 27848 CUBESAT XI-IV       2025-11-21 16:56:15 JST   2025-11-21 17:11:10 JST   14 min 55 s     0 h 41 min 18 s   156.40 SSE   351.58 N      72.83 ENE    62.60   
- 7530  OSCAR 7             2025-11-21 17:03:50 JST   2025-11-21 17:26:00 JST   22 min 10 s     0 h 48 min 53 s   162.41 SSE   343.10 NNW   250.54 WSW    85.23   
- 27844 CUTE-1              2025-11-21 17:58:55 JST   2025-11-21 18:13:15 JST   14 min 20 s     1 h 43 min 58 s   189.89 S     335.34 NNW   261.64 W      32.14   
- 27848 CUBESAT XI-IV       2025-11-21 18:37:55 JST   2025-11-21 18:50:05 JST   12 min 10 s     2 h 22 min 58 s   213.28 SW    322.43 NW    266.46 W      13.40   
- 7530  OSCAR 7             2025-11-21 19:00:00 JST   2025-11-21 19:17:10 JST   17 min 10 s     2 h 45 min  3 s   215.71 SW    320.93 NW    267.04 W      14.00   
- 24278 JAS 2 (FO-29)       2025-11-21 19:20:50 JST   2025-11-21 19:36:35 JST   15 min 45 s     3 h  5 min 53 s    32.93 NE    140.68 SE     86.00 E      14.52 
+ 27844 CUTE-1              2025-11-21 16:19:25 UTC   2025-11-21 16:33:15 UTC     13m 50s      0h  4m 28s        135.66 SE      1.09 N      67.50 ENE    27.12
+ 28895 CUBESAT XI-V        2025-11-21 16:42:45 UTC   2025-11-21 16:53:15 UTC     10m 30s      0h 27m 48s        348.77 N     241.77 WSW   294.94 WNW    12.84
 ```
+
+#### `tle` - Display TLE data
+
+Displays the Two-Line Element set for configured satellites.
+
+```sh
+sattrack tle
+```
+
+#### `tle parse` - Parse and display orbital elements
+
+Parses the TLE and displays the orbital elements in a human-readable format.
+
+```sh
+sattrack tle parse
+# Output:
+# ISS (ZARYA)
+#   NORAD ID: 25544
+#   Classification: U
+#   Designator: 98067A
+#   Epoch: 2025-11-21 12:34:56 UTC
+#   Inclination: 51.6414 deg
+#   Right Ascension of Ascending Node: 247.4825 deg
+#   Eccentricity: 0.0006102
+#   Argument of Perigee: 52.7634 deg
+#   Mean Anomaly: 64.3421 deg
+#   Mean Motion: 15.50094728 revs per day
+#   ...
+```
+
+#### `geo` - Get geodetic location
+
+Calculates the geodetic location (latitude, longitude, altitude) of a satellite at a given time.
+
+```sh
+sattrack geo 25544 "2025-12-01 12:00:00"
+# Output:
+# Satellite: ISS (ZARYA)
+#   Latitude: 23.45 deg
+#   Longitude: -78.12 deg
+#   Altitude: 420.5 km
+```
+
+#### `add` - Add a satellite to track
+
+Adds a satellite by its NORAD ID to your configuration file.
+
+```sh
+sattrack add 25544
+```
+
+#### `remove` - Remove a satellite
+
+Removes a satellite from your configuration file.
+
+```sh
+sattrack remove 25544
+```
+
+#### `key` - Set API key
+
+Sets your N2YO API key in the configuration file.
+
+```sh
+sattrack key YOUR-API-KEY-HERE
+```
+
+### Global Options
+
+- `--config <path>` - Path to configuration file (default: ~/.sattrack.toml)
+- `--key <key>` - N2YO API key
+- `--id <id>` - NORAD ID of satellite to track (can be specified multiple times)
+- `--lat <lat>` - Latitude of ground station in decimal degrees
+- `--long <long>` - Longitude of ground station in decimal degrees
+- `--alt <alt>` - Altitude above sea level in meters
+- `-v, --verbose` - Display debugging information
 
 ## Dependencies
 
