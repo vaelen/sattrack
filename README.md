@@ -36,7 +36,7 @@ I used Claude Code to help speed up my implementation of SatTrack by helping me 
 
 ## Data sources
 
-SatTrack uses Celestrak as its primary source for TLE data.
+SatTrack uses [CelesTrak](https://celestrak.org/) as its primary source for TLE data. CelesTrak is a non-profit service that provides satellite information for free. If you feel so inclined, they take donations to help cover their costs.
 
 In addition, SatTrack can get both TLE and pass data from [N2YO](https://www.n2yo.com). If you want to use the N2YO APIs you will need an API key, which you can get by signing up for a free account at N2YO.
 
@@ -45,7 +45,8 @@ In addition, SatTrack can get both TLE and pass data from [N2YO](https://www.n2y
 All configuration options can be provided on the command line, but you can also create a config file to store common options, like your N2YO API key and the list of satellites you care about. The config file is stored in TOML format and the options available are the same as the command line options. The config file is located at `~/.sattrack.toml` by default, but you can also supply a path to the config file using the `--config` command line option.
 
 Here is an example config file:
-```
+
+```toml
 # Station Location
 lat = 35.58
 long = 139.48
@@ -62,14 +63,35 @@ n2yo.passes.id = [25544,36122,28895,27848,27844,32785,22825,7530,25397,24278]
 ## Usage
 
 The most common usage pattern looks like this:
+
 ```sh
-sattrack update
+# First update our TLE in case it is out of date
+$ sattrack update
+
+Loading TLE database from file: /home/andrew/.sattrack.tle
+Loading TLE database...  done.
+Loaded 13526 TLE entries.
+Downloading TLE data for group: active... Done.
+Saving TLE database to file: /home/andrew/.sattrack.tle
+Saving TLE database...  done.
+Saved 13526 TLE entries.
 
 # This doesn't work yet
-sattrack passes 25544
+# $ sattrack passes 25544
 
-sattrack info 25544
-sattrack geo 25544
+# Get the list of upcoming passes from N2YO
+$ sattrack n2yo passes 25544
+
+Loading Passes.... Done.
+
+Upcoming Passes:
+        Satellite                   Start                      End               Duration        Starts In        Start Az      End Az       Max Az     Max Elev 
+------------------------- ------------------------- ------------------------- -------------- ------------------ ------------ ------------ ------------ ----------
+ 25544 SPACE STATION       2025-12-02 08:54:05 UTC   2025-12-02 09:04:40 UTC      10m 35s        0h 18m 36s      305.89 NW    146.38 SE    227.42 SW     44.89   
+ 25544 SPACE STATION       2025-12-02 23:58:40 UTC   2025-12-03 00:08:45 UTC      10m  5s       15h 23m 11s      200.24 SSW    61.04 ENE   129.79 SE     24.05   
+ 25544 SPACE STATION       2025-12-03 01:35:15 UTC   2025-12-03 01:45:35 UTC      10m 20s       16h 59m 46s      250.99 WSW    39.72 NE    324.91 NW     29.10   
+ 25544 SPACE STATION       2025-12-03 06:29:55 UTC   2025-12-03 06:39:10 UTC       9m 15s       21h 54m 26s      325.74 NW     84.77 E      25.10 NNE    13.44   
+ 25544 SPACE STATION       2025-12-03 08:06:25 UTC   2025-12-03 08:17:05 UTC      10m 40s       23h 30m 56s      311.42 NW    133.40 SE    179.33 S      88.33   
 ```
 
 ### Commands
@@ -171,3 +193,4 @@ SatTrack depends on these libraries:
 2. [RapidJSON](https://rapidjson.org) is used to parse JSON.
 3. [curlpp](https://github.com/jpbarrette/curlpp) wraps [libcurl](https://curl.se/libcurl/) in a C++ interface for making HTTPS requests.
 4. [CLI11](https://github.com/CLIUtils/CLI11) for command-line argument parsing.
+5. [Google Test](https://github.com/google/googletest) for unit testing (only needed for running tests).

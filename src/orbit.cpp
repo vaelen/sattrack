@@ -644,7 +644,7 @@ void loadTLEDatabase(std::istream &s, std::map<int, Orbit> &database, std::ostre
     bool haveSecondLine = false;
     std::string line, line1, line2, nameLine;
     int entriesLoaded = 0;
-    logStream << "Loading TLE database... ";
+    logStream << "Loading TLE database... " << std::flush;
     while (std::getline(s, line)) {
         if (line.empty()) continue;
 
@@ -678,6 +678,7 @@ void loadTLEDatabase(std::istream &s, std::map<int, Orbit> &database, std::ostre
     }
     logStream << " done." << std::endl;
     logStream << "Loaded " << entriesLoaded << " TLE entries." << std::endl;
+    logStream << std::flush;
 }
 
 // Save TLE database to file using the standard 3-line TLE format
@@ -692,7 +693,7 @@ void saveTLEDatabase(const std::string &filepath, const std::map<int, Orbit> &da
 
 // Save TLE database to stream using the standard 3-line TLE format
 void saveTLEDatabase(std::ostream &s, const std::map<int, Orbit> &database, std::ostream &logStream) {
-    logStream << "Saving TLE database... ";
+    logStream << "Saving TLE database... " << std::flush;
     int count = 0;
     for (const auto &[id, orbit] : database) {
         s << orbit.getTLE();
@@ -700,6 +701,7 @@ void saveTLEDatabase(std::ostream &s, const std::map<int, Orbit> &database, std:
     }
     logStream << " done." << std::endl;
     logStream << "Saved " << count << " TLE entries." << std::endl;
+    logStream << std::flush;
 }
 
 } // namespace sattrack

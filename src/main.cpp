@@ -67,7 +67,7 @@ void printPasses(const std::vector<int> &noradIDs, sattrack::Config &config) {
 
         std::vector<RadioPassWrapper> passes;
 
-        std::cout << "Loading Passes..." << std::flush;
+        std::cerr << "Loading Passes..." << std::flush;
         for (auto noradID : noradIDs) {
             auto response = n2yo::getRadioPasses(config.getAPIKey(),
                 noradID, config.getLatitude(), config.getLongitude(), config.getAltitude(),
@@ -75,9 +75,8 @@ void printPasses(const std::vector<int> &noradIDs, sattrack::Config &config) {
             for (auto pass: response.passes) {
                 passes.emplace_back(response.info, pass);
             }
-            std::cout << "." << std::flush;
         }
-        std::cout << " Done." << std::endl << std::endl << std::flush;
+        std::cerr << " Done." << std::endl << std::endl << std::flush;
 
         // Sort by startUTC (ascending)
         auto comparator = [](const RadioPassWrapper& a, const RadioPassWrapper& b) {
@@ -359,13 +358,14 @@ int main(int argc, char* argv[]) {
             }
 
             for (auto group : groups) {
-                std::cout << "Downloading TLE data for group: " << group << std::endl;
+                std::cout << "Downloading TLE data for group: " << group << "..." << std::flush;
                 auto response = celestrak::getTLE(group, config.getVerbose());
                 for (auto tle : response.entries) {
                     sattrack::Orbit orbit;
                     orbit.updateFromTLE(tle);
                     satellites[orbit.getNoradID()] = orbit;
                 }
+                std::cout << " Done." << std::endl << std::flush;
             }
 
             saveTLEDatabase(tleFilename, satellites);
