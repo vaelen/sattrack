@@ -32,7 +32,7 @@ std::string expandTilde(const std::string &path) {
 
 /** Convert azimuth in radians to compass direction string */
 std::string azimuthToCompass(double azimuthRad) {
-    double deg = azimuthRad * (180.0 / M_PI);
+    double deg = azimuthRad * sattrack::RADIANS_TO_DEGREES;
     if (deg < 0) deg += 360.0;
     if (deg >= 360.0) deg -= 360.0;
 
@@ -69,7 +69,37 @@ std::chrono::system_clock::time_point toTimePoint(const long timestamp) {
     );
 }
 
-void printPasses(const std::vector<int> &noradIDs, sattrack::Config &config) {
+sattrack::PassInfo convertN2YOPassToPassInfo(
+    const n2yo::RadioPass &n2yoPass,
+    const n2yo::SatelliteInfo &satInfo) {
+
+    using namespace sattrack;
+    using namespace std::chrono;
+
+    PassInfo passInfo;
+
+    passInfo.noradID = satInfo.id;
+    passInfo.name = satInfo.name;
+    passInfo.riseTime = toTimePoint(n2yoPass.startUTC);
+    passInfo.setTime = toTimePoint(n2yoPass.endUTC);
+    passInfo.maxElevationTime = toTimePoint(n2yoPass.maxUTC);
+    passInfo.riseAngles.azimuthInRadians = n2yoPass.startAz * RADIANS_TO_DEGREES;
+    passInfo.riseAngles.elevationInRadians = 0.0;  // N2YO does not provide elevation at rise
+    passInfo.riseAngles.rangeInKilometers = 0.0;  // N2YO does not provide range at rise
+    passInfo.maxAngles.azimuthInRadians = n2yoPass.maxAz * RADIANS_TO_DEGREES;
+    passInfo.maxAngles.elevationInRadians = n2yoPass.maxEl * RADIANS_TO_DEGREES;
+    passInfo.maxAngles.rangeInKilometers = 0.0;  // N2YO does not provide range at max elevation
+    passInfo.setAngles.azimuthInRadians = n2yoPass.endAz * RADIANS_TO_DEGREES;
+    passInfo.setAngles.elevationInRadians = 0.0;  // N2YO does not provide elevation at set
+    passInfo.setAngles.rangeInKilometers = 0.0;  // N2YO does not provide range at set
+
+    return passInfo;
+}
+
+void printPasses(std::vector<sattrack::PassInfo> passes) {
+    using namespace sattrack;
+    using namespace std::chrono;
+
     try {
         constexpr std::string_view rowFormat = "{:^25} {:^25} {:^25} {:^14} {:^18} {:^12} {:^12} {:^12} {:^10}";
         constexpr std::string_view satFormat = " {:<5} {:<17}";
@@ -86,62 +116,41 @@ void printPasses(const std::vector<int> &noradIDs, sattrack::Config &config) {
         std::string sep12(12, '-');
         std::string sep10(10, '-');
 
-        struct RadioPassWrapper {
-            n2yo::SatelliteInfo info;
-            n2yo::RadioPass pass;
-        };
-
-        std::vector<RadioPassWrapper> passes;
-
-        std::cerr << "Loading Passes..." << std::flush;
-        for (auto noradID : noradIDs) {
-            auto response = n2yo::getRadioPasses(config.getAPIKey(),
-                noradID, config.getLatitude(), config.getLongitude(), config.getAltitude(),
-                config.getDays(), config.getMinimumElevation(), config.getVerbose());
-            for (auto pass: response.passes) {
-                passes.emplace_back(response.info, pass);
-            }
-        }
-        std::cerr << " Done." << std::endl << std::endl << std::flush;
-
-        // Sort by startUTC (ascending)
-        auto comparator = [](const RadioPassWrapper& a, const RadioPassWrapper& b) {
-            return a.pass.startUTC < b.pass.startUTC;
+        // Sort by riseTime (ascending)
+        auto comparator = [](const sattrack::PassInfo& a, const sattrack::PassInfo& b) {
+            return a.riseTime < b.riseTime;
         };
         std::sort(passes.begin(), passes.end(), comparator);
 
         std::cout << "Upcoming Passes:" << std::endl;
         std::cout << std::format(rowFormat, "Satellite", "Start", "End", "Duration", "Starts In", "Start Az", "End Az", "Max Az", "Max Elev") << std::endl;
         std::cout << std::format(rowFormat, sep25, sep25, sep25, sep14, sep18, sep12, sep12, sep12, sep10) << std::endl;
-        for (auto wrapper: passes) {
-            auto info = wrapper.info;
-            auto pass = wrapper.pass;
+        for (const auto& pass : passes) {
             // Calculate all our times and durations
-            auto startTime = toTimePoint(pass.startUTC);
-            auto endTime = toTimePoint(pass.endUTC);
-            auto duration = std::chrono::seconds(pass.endUTC - pass.startUTC);
-            auto durationMins = std::chrono::duration_cast<std::chrono::minutes>(duration).count();
-            auto durationSecs = std::chrono::duration_cast<std::chrono::seconds>(duration % std::chrono::minutes(1)).count();
-            auto now = std::chrono::system_clock::now();
-            auto nowSeconds = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
-            auto eta = std::chrono::seconds(pass.startUTC - nowSeconds);
-            auto etaHours = std::chrono::duration_cast<std::chrono::hours>(eta).count();
-            auto etaMins = std::chrono::duration_cast<std::chrono::minutes>(eta % std::chrono::hours(1)).count();
-            auto etaSecs = std::chrono::duration_cast<std::chrono::seconds>(eta % std::chrono::minutes(1)).count();
+            auto startTime = pass.riseTime;
+            auto endTime = pass.setTime;
+            auto duration = duration_cast<seconds>(endTime - startTime);
+            auto durationMins = duration_cast<minutes>(duration).count();
+            auto durationSecs = duration_cast<seconds>(duration % minutes(1)).count();
+            auto now = system_clock::now();
+            auto eta = duration_cast<seconds>(startTime - now);
+            auto etaHours = duration_cast<hours>(eta).count();
+            auto etaMins = duration_cast<minutes>(eta % hours(1)).count();
+            auto etaSecs = duration_cast<seconds>(eta % minutes(1)).count();
 
             // Output the pass data
             auto startTimeSeconds = std::chrono::floor<std::chrono::seconds>(startTime);
             auto endTimeSeconds = std::chrono::floor<std::chrono::seconds>(endTime);
             std::cout << std::format(rowFormat,
-                std::format(satFormat, info.id, info.name),
+                std::format(satFormat, pass.noradID, pass.name),
                 date::format(timeFormat, startTimeSeconds),
                 date::format(timeFormat, endTimeSeconds),
                 std::format(durationFormat, durationMins, durationSecs),
                 std::format(etaFormat, etaHours, etaMins, etaSecs),
-                std::format(azFormat, pass.startAz, pass.startAzCompass),
-                std::format(azFormat, pass.endAz, pass.endAzCompass),
-                std::format(azFormat, pass.maxAz, pass.maxAzCompass),
-                std::format(elFormat, pass.maxEl)) << std::endl;
+                std::format(azFormat, pass.riseAngles.azimuthInRadians * RADIANS_TO_DEGREES, azimuthToCompass(pass.riseAngles.azimuthInRadians)),
+                std::format(azFormat, pass.setAngles.azimuthInRadians * RADIANS_TO_DEGREES, azimuthToCompass(pass.setAngles.azimuthInRadians)),
+                std::format(azFormat, pass.maxAngles.azimuthInRadians * RADIANS_TO_DEGREES, azimuthToCompass(pass.maxAngles.azimuthInRadians)),
+                std::format(elFormat, pass.maxAngles.elevationInRadians * RADIANS_TO_DEGREES)) << std::endl;
         }
         std::cout << std::endl;
     } catch (const std::exception &err) {
@@ -383,7 +392,29 @@ int main(int argc, char* argv[]) {
             std::cerr << n2yoPassesCommand->help() << std::endl;
             std::exit(1);
         }
-        printPasses(n2yoIDs, config);
+        try {
+            struct RadioPassWrapper {
+                n2yo::SatelliteInfo info;
+                n2yo::RadioPass pass;
+            };
+
+            std::vector<sattrack::PassInfo> passes;
+
+            std::cerr << "Fetching Passes from N2YO..." << std::flush;
+            for (auto noradID : n2yoIDs) {
+                auto response = n2yo::getRadioPasses(config.getAPIKey(),
+                    noradID, config.getLatitude(), config.getLongitude(), config.getAltitude(),
+                    config.getDays(), config.getMinimumElevation(), config.getVerbose());
+                for (auto pass: response.passes) {
+                    passes.emplace_back(convertN2YOPassToPassInfo(pass, response.info));
+                }
+            }
+            std::cerr << " Done." << std::endl << std::endl << std::flush;
+            printPasses(passes);
+        } catch (const std::exception &err) {
+            std::cerr << err.what() << std::endl;
+            std::exit(1);
+        }
     });
 
     satInfoCommand->final_callback([satInfoCommand, &satInfoIDs, &tleFilename](void) {
@@ -640,6 +671,7 @@ int main(int argc, char* argv[]) {
     });
 
     passesCommand->final_callback([passesCommand, &config, &tleFilename, &passesIDs](void) {
+        using namespace sattrack;
         try {
             if (passesIDs.empty()) {
                 std::cerr << "Please provide at least one satellite's Norad ID." << std::endl;
@@ -658,6 +690,8 @@ int main(int argc, char* argv[]) {
             double minElevRad = config.getMinimumElevation() * (M_PI / 180.0);
             auto searchDuration = std::chrono::hours(24 * config.getDays());
 
+            std::vector<PassInfo> passes;
+
             for (auto noradID : passesIDs) {
                 if (!satellites.contains(noradID)) {
                     std::cerr << "Satellite with Norad ID " << noradID << " not found in the local TLE database." << std::endl;
@@ -672,14 +706,6 @@ int main(int argc, char* argv[]) {
                 auto endTime = searchTime + searchDuration;
                 int passCount = 0;
 
-                constexpr std::string_view headerFormat = "{:^25} {:^25} {:^14} {:^12} {:^12} {:^10}";
-                constexpr std::string_view rowFormat = "{:^25} {:^25} {:^14} {:>6.2f} {:>3} {:>6.2f} {:>3} {:>6.2f}";
-
-                std::cout << std::format(headerFormat, "Rise", "Set", "Duration", "Rise Az", "Max Az", "Max Elev") << std::endl;
-                std::cout << std::format(headerFormat,
-                    std::string(25, '-'), std::string(25, '-'), std::string(14, '-'),
-                    std::string(12, '-'), std::string(12, '-'), std::string(10, '-')) << std::endl;
-
                 while (searchTime < endTime) {
                     auto pass = sattrack::findNextPass(orbit, observer, minElevRad, searchTime);
                     if (!pass.has_value()) {
@@ -687,36 +713,19 @@ int main(int argc, char* argv[]) {
                     }
 
                     passCount++;
-
-                    auto duration = pass->setTime - pass->riseTime;
-                    auto durationSecs = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
-                    int durationMins = durationSecs / 60;
-                    int durationRemSecs = durationSecs % 60;
-
-                    auto riseSeconds = std::chrono::floor<std::chrono::seconds>(pass->riseTime);
-                    auto setSeconds = std::chrono::floor<std::chrono::seconds>(pass->setTime);
-
-                    double riseAzDeg = pass->riseAngles.azimuthInRadians * (180.0 / M_PI);
-                    double maxAzDeg = pass->maxAngles.azimuthInRadians * (180.0 / M_PI);
-                    double maxElDeg = pass->maxAngles.elevationInRadians * (180.0 / M_PI);
-
-                    std::cout << std::format(rowFormat,
-                        date::format("%F %T UTC", riseSeconds),
-                        date::format("%F %T UTC", setSeconds),
-                        std::format("{}m {}s", durationMins, durationRemSecs),
-                        riseAzDeg, azimuthToCompass(pass->riseAngles.azimuthInRadians),
-                        maxAzDeg, azimuthToCompass(pass->maxAngles.azimuthInRadians),
-                        maxElDeg) << std::endl;
+                    passes.push_back(*pass);
 
                     // Move past this pass
                     searchTime = pass->setTime + std::chrono::minutes(1);
                 }
 
                 if (passCount == 0) {
-                    std::cout << "  No passes found. (findNextPass not yet implemented)" << std::endl;
+                    std::cerr << "No passes found for " << orbit.getName() << "(" << noradID << ")" << std::endl;
                 }
-                std::cout << std::endl;
             }
+
+            printPasses(passes);
+
         } catch (const std::exception &err) {
             std::cerr << err.what() << std::endl;
             std::exit(1);

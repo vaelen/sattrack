@@ -19,20 +19,6 @@
 
 namespace sattrack {
 
-// Astronomical constants
-constexpr double J2000_JD = 2451545.0;                      // Julian Date of J2000.0 epoch
-constexpr double DAYS_PER_JULIAN_CENTURY = 36525.0;         // Days in a Julian century
-constexpr double GMST_AT_J2000 = 280.46061837;              // GMST at J2000.0 epoch (degrees)
-constexpr double EARTH_SIDEREAL_RATE = 360.98564736629;     // Earth's rotation rate (deg/day)
-
-// IAU polynomial correction coefficients for long-term variations in Earth's rotation
-constexpr double GMST_T2_COEFF = 0.000387933;   // Quadratic correction for precession (T² term)
-constexpr double GMST_T3_DIVISOR = 38710000.0;  // Cubic correction divisor (T³ term)
-
-// Degree-radian conversion factors
-constexpr double DEGREES_TO_RADIANS = std::numbers::pi / 180.0;
-// constexpr double RADIANS_TO_DEGREES = 180.0 / std::numbers::pi;
-
 // Helper function to trim leading spaces from a string_view
 std::string_view trimLeft(const std::string_view &str) {
     auto pos = str.find_first_not_of(' ');
@@ -573,12 +559,14 @@ std::optional<PassInfo> findNextPass(
     LookAngles setAngles = getLookAngles(orbit, observer, setJD);
 
     return PassInfo{
-        preciseRise,
-        maxTime,
-        preciseSet,
-        riseAngles,
-        maxAngles,
-        setAngles
+        .noradID = orbit.getNoradID(),
+        .name = orbit.getName(),
+        .riseTime = preciseRise,
+        .maxElevationTime = maxTime,
+        .setTime = preciseSet,
+        .riseAngles = riseAngles,
+        .maxAngles = maxAngles,
+        .setAngles = setAngles
     };
 }
 
