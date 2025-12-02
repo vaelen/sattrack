@@ -35,23 +35,6 @@ public:
     double getAltitude();
     void setAltitude(const double a);
 
-    void addSatellite(const int noradID);
-    
-    template<typename Container>
-    std::enable_if<std::is_same_v<typename Container::value_type, int>>
-    addAllSatellites(const Container &noradIDs);
-
-    void removeSatellite(const int noradID);
-
-    template<typename Container>
-    std::enable_if<std::is_same_v<typename Container::value_type, int>> 
-    removeAllSatellites(const Container &noradIDs);
-
-    void clearSatellites();
-    std::set<int> getSatellites();
-
-    bool hasSatellites();
-
     int getDays();
     void setDays(const int days);
 
@@ -63,13 +46,11 @@ public:
 
     time_point getTime();
     void setTime(const time_point tp);
-
 private:
     std::optional<std::string> apiKey;
     double longitude;
     double latitude;
     double altitude;
-    std::set<int> satellites;
     int days;
     int minimumElevation;
     bool verbose;

@@ -10,6 +10,7 @@
 #include <cmath>
 #include <string>
 #include <string_view>
+#include <iostream>
 #include <map>
 
 namespace sattrack {
@@ -106,10 +107,10 @@ double gmst(double julianDate);
 Vec3 eciToECEF(const Vec3 &eci, double gst);
 Geodetic ecefToGeodetic(const Vec3 &ecef);
 
-void loadTLEDatabase(std::istream &s, std::map<int, Orbit> &database);
-void loadTLEDatabase(const std::string &filepath, std::map<int, Orbit> &database);
-void saveTLEDatabase(std::ostream &s, const std::map<int, Orbit> &database);
-void saveTLEDatabase(const std::string &filepath, const std::map<int, Orbit> &database);
+void loadTLEDatabase(std::istream &s, std::map<int, Orbit> &database, std::ostream &logStream = std::cerr);
+void loadTLEDatabase(const std::string &filepath, std::map<int, Orbit> &database, std::ostream &logStream = std::cerr);
+void saveTLEDatabase(std::ostream &s, const std::map<int, Orbit> &database, std::ostream &logStream = std::cerr);
+void saveTLEDatabase(const std::string &filepath, const std::map<int, Orbit> &database, std::ostream &logStream = std::cerr);
 
 // TLE formatting utilities
 int calculateChecksum(const std::string& line);

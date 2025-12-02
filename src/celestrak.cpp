@@ -62,37 +62,27 @@ std::string trim(const std::string& str) {
 
 // Parse TLE format response into entries
 // TLE format: Name line, Line 1, Line 2, repeated
-std::vector<TLEEntry> parseTLEResponse(const std::string& response) {
-    std::vector<TLEEntry> entries;
+std::vector<std::string> parseTLEResponse(const std::string& response) {
+    std::vector<std::string> entries;
     std::istringstream stream(response);
     std::string line;
-    std::vector<std::string> lines;
+    std::ostringstream entryStream;
 
     // Read all non-empty lines
+    int lineCount = 0;
     while (std::getline(stream, line)) {
         std::string trimmed = trim(line);
         if (!trimmed.empty()) {
-            lines.push_back(trimmed);
+            lineCount++;
+            entryStream << trimmed << '\n';
+            if (lineCount == 3) {
+                entries.push_back(entryStream.str());
+                entryStream.str("");
+                entryStream.clear();
+                lineCount = 0;
+            }
         }
     }
-
-    // Parse in groups of 3 (name, line1, line2)
-    for (size_t i = 0; i + 2 < lines.size(); i += 3) {
-        const std::string& name = lines[i];
-        const std::string& line1 = lines[i + 1];
-        const std::string& line2 = lines[i + 2];
-
-        // Validate TLE lines start with "1 " and "2 "
-        if (line1.length() >= 2 && line1[0] == '1' && line1[1] == ' ' &&
-            line2.length() >= 2 && line2[0] == '2' && line2[1] == ' ') {
-            entries.push_back({
-                .name = name,
-                .line1 = line1,
-                .line2 = line2
-            });
-        }
-    }
-
     return entries;
 }
 
@@ -114,7 +104,7 @@ TLEResponse getTLE(const std::string& group, bool debug) {
     }
 
     // Parse the TLE data
-    std::vector<TLEEntry> entries = parseTLEResponse(response);
+    std::vector<std::string> entries = parseTLEResponse(response);
 
     if (entries.empty() && !response.empty()) {
         throw std::runtime_error("Failed to parse TLE data from Celestrak response");

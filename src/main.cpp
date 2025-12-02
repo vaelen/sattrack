@@ -43,7 +43,7 @@ std::chrono::system_clock::time_point toTimePoint(const long timestamp) {
     );
 }
 
-void printPasses(sattrack::Config &config) {
+void printPasses(const std::vector<int> &noradIDs, sattrack::Config &config) {
     try {
         constexpr std::string_view rowFormat = "{:^25} {:^25} {:^25} {:^14} {:^18} {:^12} {:^12} {:^12} {:^10}";
         constexpr std::string_view satFormat = " {:<5} {:<17}";
@@ -68,7 +68,7 @@ void printPasses(sattrack::Config &config) {
         std::vector<RadioPassWrapper> passes;
 
         std::cout << "Loading Passes..." << std::flush;
-        for (auto noradID : config.getSatellites()) {
+        for (auto noradID : noradIDs) {
             auto response = n2yo::getRadioPasses(config.getAPIKey(),
                 noradID, config.getLatitude(), config.getLongitude(), config.getAltitude(),
                 config.getDays(), config.getMinimumElevation(), config.getVerbose());
@@ -135,6 +135,9 @@ int main(int argc, char* argv[]) {
     config.setDays(1);
     config.setMinimumElevation(10);
     config.setVerbose(false);
+    config.setTime(std::chrono::system_clock::now());
+
+    auto tleFilename = expandTilde("~/.sattrack.tle");
 
     auto configFile = expandTilde("~/.sattrack.toml");
 
@@ -143,9 +146,6 @@ int main(int argc, char* argv[]) {
 
     app.set_config("--config", configFile, "Read configuration from this file (default: " + configFile + ").");
 
-    std::vector<int> ids;
-
-    app.add_option("--id", ids, "Norad ID of satellite to track (can be listed more than once)");
     app.add_option_function<double>("--lat", 
         [&config](const double l) { config.setLatitude(l); },
         "The latitude of the ground station (in decimal format)");
@@ -159,60 +159,62 @@ int main(int argc, char* argv[]) {
         [&config](const int64_t v) { config.setVerbose(v > 0); },
         "Display debugging information");
     
-    app.require_subcommand();
     app.ignore_case();
 
-    auto addCommand = app.add_subcommand("add", "Add satellite");
-    addCommand->add_option_function<int>("id",
-        [&config](const int id) { config.addSatellite(id); },
-        "Norad ID of satellite to start tracking");
-
-    auto removeCommand = app.add_subcommand("remove", "Remove satellite");
-    removeCommand->add_option_function<int>("id",
-        [&config](const int id) { config.removeSatellite(id); },
-        "Norad ID of satellite to stop tracking");
-
     // n2yo command - access N2YO APIs
-    auto n2yoCommand = app.add_subcommand("n2yo", "Access N2YO APIs");
+    auto n2yoCommand = app.add_subcommand("n2yo", "Get satellite info from N2YO");
     n2yoCommand->add_option_function<std::string>("--key",
         [&config](const std::string &key) { config.setAPIKey(key); },
         "N2YO API key");
 
-    auto n2yoKeyCommand = n2yoCommand->add_subcommand("key", "Set N2YO API key");
-    n2yoKeyCommand->add_option_function<std::string>("key",
+    std::vector<int> n2yoIDs;
+
+    auto n2yoTleCommand = n2yoCommand->add_subcommand("tle", "Display raw TLE data from N2YO");
+    n2yoTleCommand->add_option_function<std::string>("--key",
         [&config](const std::string &key) { config.setAPIKey(key); },
         "N2YO API key");
+    n2yoTleCommand->add_option("id", n2yoIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
+    
+    auto n2yoInfoCommand = n2yoCommand->add_subcommand("info", "Display a satellite's orbital elements");
+    n2yoInfoCommand->add_option_function<std::string>("--key",
+        [&config](const std::string &key) { config.setAPIKey(key); },
+        "N2YO API key");
+    n2yoInfoCommand->add_option("id", n2yoIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
 
-    auto n2yoTleCommand = n2yoCommand->add_subcommand("tle", "TLE operations");
-    auto n2yoTleViewCommand = n2yoTleCommand->add_subcommand("view", "Display TLE from N2YO");
-    auto n2yoTleParseCommand = n2yoTleCommand->add_subcommand("parse", "Parse TLE and display orbital elements");
-
-    auto n2yoUpdateCommand = n2yoCommand->add_subcommand("update", "Update local TLE from N2YO");
+    auto n2yoUpdateCommand = n2yoCommand->add_subcommand("update", "Update local TLE data from N2YO");
+    n2yoUpdateCommand->add_option_function<std::string>("--key",
+        [&config](const std::string &key) { config.setAPIKey(key); },
+        "N2YO API key");
+    n2yoUpdateCommand->add_option("id", n2yoIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
 
     auto n2yoPassesCommand = n2yoCommand->add_subcommand("passes", "Display future passes");
+    n2yoPassesCommand->add_option_function<std::string>("--key",
+        [&config](const std::string &key) { config.setAPIKey(key); },
+        "N2YO API key");
     n2yoPassesCommand->add_option_function<int>("--days",
         [&config](const int days) { config.setDays(days); },
         "Number of days worth of passes to display (default 1, max 10)");
     n2yoPassesCommand->add_option_function<int>("--elev",
         [&config](const int elev) { config.setMinimumElevation(elev); },
         "Minimum pass elevation above the horizon in degrees (default 10, max 90)");
+    n2yoPassesCommand->add_option("id", n2yoIDs, "Norad ID(s) of satellite(s)");
 
-    // celestrak command - access Celestrak APIs
-    auto celestrakCommand = app.add_subcommand("celestrak", "Access Celestrak APIs");
-    auto celestrakTleCommand = celestrakCommand->add_subcommand("tle", "TLE operations");
-    auto celestrakTleViewCommand = celestrakTleCommand->add_subcommand("view", "Display TLE from Celestrak");
-    auto celestrakTleUpdateCommand = celestrakTleCommand->add_subcommand("update", "Update local TLE from Celestrak");
+    auto satInfoCommand = app.add_subcommand("info", "View satellite information from the local TLE database");
+    
+    std::vector<int> satInfoIDs;
+    satInfoCommand->add_option("id", satInfoIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
 
-    // tle command - local TLE operations
-    auto tleCommand = app.add_subcommand("tle", "Local TLE operations");
-    auto tleViewCommand = tleCommand->add_subcommand("view", "View local TLE data");
-    auto tleUpdateCommand = tleCommand->add_subcommand("update", "Update local TLE data");
+    auto updateCommand = app.add_subcommand("update", "Update local TLE data from Celestrak");
+    
+    std::vector<std::string> groups;
+    updateCommand->add_option<std::vector<std::string>>("group", groups, "Celestrak TLE group(s) to download (default: active)");
 
     auto geoCommand = app.add_subcommand("geo", "Get geodetic location (lat/long/alt) of the satellite at given time");
-    geoCommand->add_option_function<int>("id", 
-        [&config](const int id) { config.addSatellite(id); },
-        "Norad ID of satellite to track");
-    geoCommand->add_option_function<std::string>("time",
+    
+    std::vector<int> geoIDs;
+    geoCommand->add_option("id", geoIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
+    
+    geoCommand->add_option_function<std::string>("--time",
         [&config](const std::string &timeStr) {
             // Parse time string into time_point using date.h
             std::istringstream in(timeStr);
@@ -222,30 +224,31 @@ int main(int argc, char* argv[]) {
                 throw std::invalid_argument("Invalid time format (expected YYYY-MM-DD HH:MM:SS UTC): " + timeStr);
             }
             config.setTime(tp);
-        }
+        }, "Time at which to get geodetic location (format: YYYY-MM-DD HH:MM:SS UTC)"
     );
 
-    app.parse_complete_callback(
-        [&config, &ids](void) {
-            if (!config.hasAPIKey()) {
-                std::cerr << "Please provide your N2YO API key." << std::endl;
-                std::exit(1);
-            }
+    // Command callbacks
 
-            for (auto id: ids) {
-                config.addSatellite(id);
-            }
-
-            if (!config.hasSatellites()) {
-                std::cerr << "Please provide at least one satellite to track." << std::endl;
-                std::exit(1);
-            }
+    n2yoCommand->final_callback([n2yoCommand](void) {
+        if (n2yoCommand->get_subcommands().empty()) {
+           std::cerr << n2yoCommand->help() << std::endl;
+           std::exit(1);
         }
-    );
+    });
 
-    n2yoTleViewCommand->final_callback([&config](void) {
+    n2yoTleCommand->final_callback([n2yoTleCommand, &config, &n2yoIDs](void) {
+        if (!config.hasAPIKey()) {
+            std::cerr << "Please provide your N2YO API key." << std::endl;
+            std::cerr << n2yoTleCommand->help() << std::endl;
+            std::exit(1);
+        }
+        if (n2yoIDs.empty()) {
+            std::cerr << "Please provide at least one satellite's Norad ID." << std::endl;
+            std::cerr << n2yoTleCommand->help() << std::endl;
+            std::exit(1);
+        }
         try {
-            for (auto noradID : config.getSatellites()) {
+            for (auto noradID : n2yoIDs) {
                 auto response = n2yo::getTLE(config.getAPIKey(), noradID, config.getVerbose());
                 std::cout << response.info.name << std::endl;
                 std::cout << response.tle << std::endl << std::endl;
@@ -256,9 +259,19 @@ int main(int argc, char* argv[]) {
         }
     });
 
-    n2yoTleParseCommand->final_callback([&config](void) {
+    n2yoInfoCommand->final_callback([n2yoInfoCommand, &config, &n2yoIDs](void) {
+        if (!config.hasAPIKey()) {
+            std::cerr << "Please provide your N2YO API key." << std::endl;
+            std::cerr << n2yoInfoCommand->help() << std::endl;
+            std::exit(1);
+        }
+        if (n2yoIDs.empty()) {
+            std::cerr << "Please provide at least one satellite's Norad ID." << std::endl;
+            std::cerr << n2yoInfoCommand->help() << std::endl;
+            std::exit(1);
+        }
         try {
-            for (auto noradID : config.getSatellites()) {
+            for (auto noradID : n2yoIDs) {
                 auto response = n2yo::getTLE(config.getAPIKey(), noradID, config.getVerbose());
                 sattrack::Orbit orbit;
                 orbit.updateFromTLE(response.info.name, response.tle);
@@ -270,12 +283,36 @@ int main(int argc, char* argv[]) {
         }
     });
 
-    n2yoUpdateCommand->final_callback([&config](void) {
+    n2yoPassesCommand->final_callback([n2yoPassesCommand, &config, &n2yoIDs](void) {
+        if (!config.hasAPIKey()) {
+            std::cerr << "Please provide your N2YO API key." << std::endl;
+            std::cerr << n2yoPassesCommand->help() << std::endl;
+            std::exit(1);
+        }
+        if (n2yoIDs.empty()) {
+            std::cerr << "Please provide at least one satellite's Norad ID." << std::endl;
+            std::cerr << n2yoPassesCommand->help() << std::endl;
+            std::exit(1);
+        }
+        printPasses(n2yoIDs, config);
+    });
+
+    satInfoCommand->final_callback([satInfoCommand, &satInfoIDs, &tleFilename](void) {
         try {
-            for (auto noradID : config.getSatellites()) {
-                auto response = n2yo::getTLE(config.getAPIKey(), noradID, config.getVerbose());
-                std::cout << response.info.name << std::endl;
-                std::cout << response.tle << std::endl << std::endl;
+            if (satInfoIDs.empty()) {
+                std::cerr << "Please provide at least one satellite's Norad ID." << std::endl;
+                std::cerr << satInfoCommand->help() << std::endl;
+                std::exit(1);
+            }
+            std::map<int, sattrack::Orbit> satellites;
+            loadTLEDatabase(tleFilename, satellites);
+            for (auto noradID : satInfoIDs) {
+                if (!satellites.contains(noradID)) {
+                    std::cerr << "Satellite with Norad ID " << noradID << " not found in the local TLE database." << std::endl;
+                    continue;
+                }
+                auto orbit = satellites[noradID];
+                orbit.printInfo(std::cout);
             }
         } catch (const std::exception &err) {
             std::cerr << err.what() << std::endl;
@@ -283,35 +320,50 @@ int main(int argc, char* argv[]) {
         }
     });
 
-    n2yoPassesCommand->final_callback([&config](void) {
-        printPasses(config);
-    });
-
-    celestrakTleViewCommand->final_callback([](void) {
-        // TODO: Implement Celestrak TLE view
-    });
-
-    celestrakTleUpdateCommand->final_callback([](void) {
-        // TODO: Implement Celestrak TLE update
-    });
-
-    tleViewCommand->final_callback([](void) {
-        // TODO: Implement local TLE view
-    });
-
-    tleUpdateCommand->final_callback([](void) {
-        // TODO: Implement local TLE update
-    });
-
-    geoCommand->final_callback([&config](void) {
+    updateCommand->final_callback([&config, &groups, &tleFilename](void) {
         try {
-            for (auto noradID : config.getSatellites()) {
-                auto response = n2yo::getTLE(config.getAPIKey(), noradID, config.getVerbose());
-                sattrack::Orbit orbit;
-                orbit.updateFromTLE(response.tle);
+            std::map<int, sattrack::Orbit> satellites;
+            loadTLEDatabase(tleFilename, satellites);
+
+            if (groups.empty()) {
+                groups.push_back("active");
+            }
+
+            for (auto group : groups) {
+                std::cout << "Downloading TLE data for group: " << group << std::endl;
+                auto response = celestrak::getTLE(group, config.getVerbose());
+                for (auto tle : response.entries) {
+                    sattrack::Orbit orbit;
+                    orbit.updateFromTLE(tle);
+                    satellites[orbit.getNoradID()] = orbit;
+                }
+            }
+
+            saveTLEDatabase(tleFilename, satellites);
+        } catch (const std::exception &err) {
+            std::cerr << err.what() << std::endl;
+            std::exit(1);
+        }
+    });
+
+    geoCommand->final_callback([geoCommand, &config, &tleFilename, &geoIDs](void) {
+        try {
+            if (geoIDs.empty()) {
+                std::cerr << "Please provide at least one satellite's Norad ID." << std::endl;
+                std::cerr << geoCommand->help() << std::endl;
+                std::exit(1);
+            }
+            std::map<int, sattrack::Orbit> satellites;
+            loadTLEDatabase(tleFilename, satellites);
+            for (auto noradID : geoIDs) {
+                if (!satellites.contains(noradID)) {
+                    std::cerr << "Satellite with Norad ID " << noradID << " not found in the local TLE database." << std::endl;
+                    continue;
+                }
+                auto orbit = satellites[noradID];
                 double julianDate = sattrack::toJulianDate(config.getTime());
                 auto geo = orbit.getGeodeticLocationAtTime(julianDate);
-                std::cout << "Satellite: " << response.info.name << std::endl;
+                std::cout << "Satellite: " << orbit.getName() << std::endl;
                 std::cout << "  Latitude: " << geo.latInRadians * (180.0 / M_PI) << " deg" << std::endl;
                 std::cout << "  Longitude: " << geo.lonInRadians * (180.0 / M_PI) << " deg" << std::endl;
                 std::cout << "  Altitude: " << geo.altInKilometers << " km" << std::endl;
@@ -324,6 +376,11 @@ int main(int argc, char* argv[]) {
     });
 
     CLI11_PARSE(app, argc, argv);
+
+    if (app.get_subcommands().empty()) {
+        std::cerr << app.help() << std::endl;
+        std::exit(1);
+    }
 
     return 0;
 }

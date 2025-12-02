@@ -12,20 +12,11 @@
 namespace celestrak {
 
 /**
- * A single TLE entry containing the satellite name and two-line elements
- */
-struct TLEEntry {
-    std::string name;
-    std::string line1;
-    std::string line2;
-};
-
-/**
  * Response containing multiple TLE entries from a group query
  */
 struct TLEResponse {
     std::string group;
-    std::vector<TLEEntry> entries;
+    std::vector<std::string> entries;
 };
 
 /**

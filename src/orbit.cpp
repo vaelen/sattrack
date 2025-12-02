@@ -12,6 +12,7 @@
 #include <ranges>
 #include <string>
 #include <string_view>
+#include <filesystem>
 #include <fstream>
 
 #include <date/date.h>
@@ -624,19 +625,26 @@ std::string Orbit::getTLE() const {
 }
 
 // Load TLE database from file using the standard 3-line TLE format
-void loadTLEDatabase(const std::string &filepath, std::map<int, Orbit> &database) {
+void loadTLEDatabase(const std::string &filepath, std::map<int, Orbit> &database, std::ostream &logStream) {
+    logStream << "Loading TLE database from file: " << filepath << std::endl;
+    if (!std::filesystem::exists(filepath)) {
+        logStream << "TLE database file does not exist: " + filepath << std::endl;
+        return;
+    }
     std::ifstream file(filepath);
     if (!file.is_open()) {
         throw std::runtime_error("Failed to open TLE database file: " + filepath);
     }
-    loadTLEDatabase(file, database);
+    loadTLEDatabase(file, database, logStream);
 }
 
 // Load TLE database from stream using the standard 3-line TLE format
-void loadTLEDatabase(std::istream &s, std::map<int, Orbit> &database) {
+void loadTLEDatabase(std::istream &s, std::map<int, Orbit> &database, std::ostream &logStream) {
     bool haveFirstLine = false;
     bool haveSecondLine = false;
     std::string line, line1, line2, nameLine;
+    int entriesLoaded = 0;
+    logStream << "Loading TLE database... ";
     while (std::getline(s, line)) {
         if (line.empty()) continue;
 
@@ -665,24 +673,33 @@ void loadTLEDatabase(std::istream &s, std::map<int, Orbit> &database) {
             line1.clear();
             line2.clear();
             nameLine.clear();
+            entriesLoaded++;
         }
     }
+    logStream << " done." << std::endl;
+    logStream << "Loaded " << entriesLoaded << " TLE entries." << std::endl;
 }
 
 // Save TLE database to file using the standard 3-line TLE format
-void saveTLEDatabase(const std::string &filepath, const std::map<int, Orbit> &database) {
+void saveTLEDatabase(const std::string &filepath, const std::map<int, Orbit> &database, std::ostream &logStream) {
     std::ofstream file(filepath);
+    logStream << "Saving TLE database to file: " << filepath << std::endl;
     if (!file.is_open()) {
         throw std::runtime_error("Failed to open file for writing: " + filepath);
     }
-    saveTLEDatabase(file, database);
+    saveTLEDatabase(file, database, logStream);
 }
 
 // Save TLE database to stream using the standard 3-line TLE format
-void saveTLEDatabase(std::ostream &s, const std::map<int, Orbit> &database) {
+void saveTLEDatabase(std::ostream &s, const std::map<int, Orbit> &database, std::ostream &logStream) {
+    logStream << "Saving TLE database... ";
+    int count = 0;
     for (const auto &[id, orbit] : database) {
         s << orbit.getTLE();
+        count++;
     }
+    logStream << " done." << std::endl;
+    logStream << "Saved " << count << " TLE entries." << std::endl;
 }
 
 } // namespace sattrack

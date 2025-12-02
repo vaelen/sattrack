@@ -47,42 +47,6 @@ void Config::setAltitude(const double a) {
     altitude = a;
 }
 
-void Config::addSatellite(const int noradID) {
-    satellites.insert(noradID);
-}
-
-template<typename Container>
-std::enable_if<std::is_same_v<typename Container::value_type, int>> 
-Config::addAllSatellites(const Container &noradIDs) {
-    for (int noradID : noradIDs) {
-        satellites.insert(noradID);
-    }
-}
-
-void Config::removeSatellite(const int noradID) {
-    satellites.erase(noradID);
-}
-
-template<typename Container>
-std::enable_if<std::is_same_v<typename Container::value_type, int>> 
-Config::removeAllSatellites(const Container &noradIDs) {
-    for (int noradID : noradIDs) {
-        satellites.erase(noradID);
-    }
-}
-
-void Config::clearSatellites() {
-    satellites.clear();
-}
-
-std::set<int> Config::getSatellites() {
-    return satellites;
-}
-
-bool Config::hasSatellites() {
-    return !satellites.empty();
-}
-
 int Config::getDays() {
     if (days > 0 && days <= 10) {
         return days;
