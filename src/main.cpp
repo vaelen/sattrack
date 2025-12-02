@@ -204,6 +204,11 @@ int main(int argc, char* argv[]) {
     std::vector<int> satInfoIDs;
     satInfoCommand->add_option("id", satInfoIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
 
+    auto tleCommand = app.add_subcommand("tle", "View raw TLE data from the local TLE database");
+    
+    std::vector<int> satTLEIDs;
+    tleCommand->add_option("id", satTLEIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
+
     auto updateCommand = app.add_subcommand("update", "Update local TLE data from Celestrak");
     
     std::vector<std::string> groups;
@@ -319,6 +324,30 @@ int main(int argc, char* argv[]) {
             std::exit(1);
         }
     });
+
+    tleCommand->final_callback([tleCommand, &satTLEIDs, &tleFilename](void) {
+        try {
+            if (satTLEIDs.empty()) {
+                std::cerr << "Please provide at least one satellite's Norad ID." << std::endl;
+                std::cerr << tleCommand->help() << std::endl;
+                std::exit(1);
+            }
+            std::map<int, sattrack::Orbit> satellites;
+            loadTLEDatabase(tleFilename, satellites);
+            for (auto noradID : satTLEIDs) {
+                if (!satellites.contains(noradID)) {
+                    std::cerr << "Satellite with Norad ID " << noradID << " not found in the local TLE database." << std::endl;
+                    continue;
+                }
+                auto orbit = satellites[noradID];
+                std::cout << orbit.getTLE() << std::endl;
+            }
+        } catch (const std::exception &err) {
+            std::cerr << err.what() << std::endl;
+            std::exit(1);
+        }
+    });
+
 
     updateCommand->final_callback([&config, &groups, &tleFilename](void) {
         try {
