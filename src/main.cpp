@@ -15,6 +15,7 @@
 #include <vector>
 #include <algorithm>
 #include <map>
+#include <thread>
 
 namespace fs = std::filesystem;
 
@@ -27,6 +28,31 @@ std::string expandTilde(const std::string &path) {
         }
     }
     return path;
+}
+
+/** Convert azimuth in radians to compass direction string */
+std::string azimuthToCompass(double azimuthRad) {
+    double deg = azimuthRad * (180.0 / M_PI);
+    if (deg < 0) deg += 360.0;
+    if (deg >= 360.0) deg -= 360.0;
+
+    if (deg < 11.25) return "N";
+    if (deg < 33.75) return "NNE";
+    if (deg < 56.25) return "NE";
+    if (deg < 78.75) return "ENE";
+    if (deg < 101.25) return "E";
+    if (deg < 123.75) return "ESE";
+    if (deg < 146.25) return "SE";
+    if (deg < 168.75) return "SSE";
+    if (deg < 191.25) return "S";
+    if (deg < 213.75) return "SSW";
+    if (deg < 236.25) return "SW";
+    if (deg < 258.75) return "WSW";
+    if (deg < 281.25) return "W";
+    if (deg < 303.75) return "WNW";
+    if (deg < 326.25) return "NW";
+    if (deg < 348.75) return "NNW";
+    return "N";
 }
 
 std::string formatTimestampUTC(const long timestamp) {
@@ -214,9 +240,68 @@ int main(int argc, char* argv[]) {
     updateCommand->add_option<std::vector<std::string>>("group", groups, "Celestrak TLE group(s) to download (default: active)");
 
     auto geoCommand = app.add_subcommand("geo", "Get geodetic location (lat/long/alt) of the satellite at given time");
-    
+
     std::vector<int> geoIDs;
     geoCommand->add_option("id", geoIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
+
+    // Look command - get current look angles for antenna pointing
+    auto lookCommand = app.add_subcommand("look", "Get look angles (azimuth/elevation/range) for antenna pointing");
+
+    std::vector<int> lookIDs;
+    lookCommand->add_option("id", lookIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
+    lookCommand->add_option_function<std::string>("--time",
+        [&config](const std::string &timeStr) {
+            std::istringstream in(timeStr);
+            std::chrono::system_clock::time_point tp;
+            in >> date::parse("%Y-%m-%d %H:%M:%S", tp);
+            if (in.fail()) {
+                throw std::invalid_argument("Invalid time format (expected YYYY-MM-DD HH:MM:SS UTC): " + timeStr);
+            }
+            config.setTime(tp);
+        }, "Time at which to get look angles (format: YYYY-MM-DD HH:MM:SS UTC)"
+    );
+
+    // Visible command - check if satellite is currently visible
+    auto visibleCommand = app.add_subcommand("visible", "Check if satellite is visible from ground station");
+
+    std::vector<int> visibleIDs;
+    visibleCommand->add_option("id", visibleIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
+    visibleCommand->add_option_function<int>("--elev",
+        [&config](const int elev) { config.setMinimumElevation(elev); },
+        "Minimum elevation above the horizon in degrees (default 10)");
+    visibleCommand->add_option_function<std::string>("--time",
+        [&config](const std::string &timeStr) {
+            std::istringstream in(timeStr);
+            std::chrono::system_clock::time_point tp;
+            in >> date::parse("%Y-%m-%d %H:%M:%S", tp);
+            if (in.fail()) {
+                throw std::invalid_argument("Invalid time format (expected YYYY-MM-DD HH:MM:SS UTC): " + timeStr);
+            }
+            config.setTime(tp);
+        }, "Time at which to check visibility (format: YYYY-MM-DD HH:MM:SS UTC)"
+    );
+
+    // Track command - real-time tracking output
+    auto trackCommand = app.add_subcommand("track", "Real-time tracking output (updates every interval)");
+
+    std::vector<int> trackIDs;
+    int trackInterval = 1;
+    int trackDuration = 60;
+    trackCommand->add_option("id", trackIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
+    trackCommand->add_option("--interval", trackInterval, "Update interval in seconds (default 1)");
+    trackCommand->add_option("--duration", trackDuration, "Duration to track in seconds (default 60)");
+
+    // Passes command - local pass prediction (no N2YO)
+    auto passesCommand = app.add_subcommand("passes", "Predict satellite passes (local calculation)");
+
+    std::vector<int> passesIDs;
+    passesCommand->add_option("id", passesIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
+    passesCommand->add_option_function<int>("--days",
+        [&config](const int days) { config.setDays(days); },
+        "Number of days to search for passes (default 1)");
+    passesCommand->add_option_function<int>("--elev",
+        [&config](const int elev) { config.setMinimumElevation(elev); },
+        "Minimum pass elevation above the horizon in degrees (default 10)");
     
     geoCommand->add_option_function<std::string>("--time",
         [&config](const std::string &timeStr) {
@@ -396,6 +481,240 @@ int main(int argc, char* argv[]) {
                 std::cout << "  Latitude: " << geo.latInRadians * (180.0 / M_PI) << " deg" << std::endl;
                 std::cout << "  Longitude: " << geo.lonInRadians * (180.0 / M_PI) << " deg" << std::endl;
                 std::cout << "  Altitude: " << geo.altInKilometers << " km" << std::endl;
+                std::cout << std::endl;
+            }
+        } catch (const std::exception &err) {
+            std::cerr << err.what() << std::endl;
+            std::exit(1);
+        }
+    });
+
+    lookCommand->final_callback([lookCommand, &config, &tleFilename, &lookIDs](void) {
+        try {
+            if (lookIDs.empty()) {
+                std::cerr << "Please provide at least one satellite's Norad ID." << std::endl;
+                std::cerr << lookCommand->help() << std::endl;
+                std::exit(1);
+            }
+            std::map<int, sattrack::Orbit> satellites;
+            loadTLEDatabase(tleFilename, satellites);
+
+            // Create observer from config (convert degrees to radians, meters to km)
+            sattrack::Geodetic observer{
+                config.getLatitude() * (M_PI / 180.0),
+                config.getLongitude() * (M_PI / 180.0),
+                config.getAltitude() / 1000.0
+            };
+
+            double julianDate = sattrack::toJulianDate(config.getTime());
+
+            for (auto noradID : lookIDs) {
+                if (!satellites.contains(noradID)) {
+                    std::cerr << "Satellite with Norad ID " << noradID << " not found in the local TLE database." << std::endl;
+                    continue;
+                }
+                auto orbit = satellites[noradID];
+                auto angles = sattrack::getLookAngles(orbit, observer, julianDate);
+
+                double azDeg = angles.azimuthInRadians * (180.0 / M_PI);
+                double elDeg = angles.elevationInRadians * (180.0 / M_PI);
+
+                std::cout << "Satellite: " << orbit.getName() << std::endl;
+                std::cout << "  Azimuth:   " << std::format("{:6.2f}", azDeg) << " deg (" << azimuthToCompass(angles.azimuthInRadians) << ")" << std::endl;
+                std::cout << "  Elevation: " << std::format("{:6.2f}", elDeg) << " deg" << std::endl;
+                std::cout << "  Range:     " << std::format("{:6.1f}", angles.rangeInKilometers) << " km" << std::endl;
+                std::cout << std::endl;
+            }
+        } catch (const std::exception &err) {
+            std::cerr << err.what() << std::endl;
+            std::exit(1);
+        }
+    });
+
+    visibleCommand->final_callback([visibleCommand, &config, &tleFilename, &visibleIDs](void) {
+        try {
+            if (visibleIDs.empty()) {
+                std::cerr << "Please provide at least one satellite's Norad ID." << std::endl;
+                std::cerr << visibleCommand->help() << std::endl;
+                std::exit(1);
+            }
+            std::map<int, sattrack::Orbit> satellites;
+            loadTLEDatabase(tleFilename, satellites);
+
+            sattrack::Geodetic observer{
+                config.getLatitude() * (M_PI / 180.0),
+                config.getLongitude() * (M_PI / 180.0),
+                config.getAltitude() / 1000.0
+            };
+
+            double julianDate = sattrack::toJulianDate(config.getTime());
+            double minElevRad = config.getMinimumElevation() * (M_PI / 180.0);
+
+            for (auto noradID : visibleIDs) {
+                if (!satellites.contains(noradID)) {
+                    std::cerr << "Satellite with Norad ID " << noradID << " not found in the local TLE database." << std::endl;
+                    continue;
+                }
+                auto orbit = satellites[noradID];
+                auto angles = sattrack::getLookAngles(orbit, observer, julianDate);
+                bool visible = sattrack::isVisible(angles, minElevRad);
+
+                double azDeg = angles.azimuthInRadians * (180.0 / M_PI);
+                double elDeg = angles.elevationInRadians * (180.0 / M_PI);
+
+                std::cout << "Satellite: " << orbit.getName() << std::endl;
+                std::cout << "  Visible:   " << (visible ? "YES" : "NO") << " (min elevation: " << config.getMinimumElevation() << " deg)" << std::endl;
+                std::cout << "  Azimuth:   " << std::format("{:6.2f}", azDeg) << " deg (" << azimuthToCompass(angles.azimuthInRadians) << ")" << std::endl;
+                std::cout << "  Elevation: " << std::format("{:6.2f}", elDeg) << " deg" << std::endl;
+                std::cout << "  Range:     " << std::format("{:6.1f}", angles.rangeInKilometers) << " km" << std::endl;
+                std::cout << std::endl;
+            }
+        } catch (const std::exception &err) {
+            std::cerr << err.what() << std::endl;
+            std::exit(1);
+        }
+    });
+
+    trackCommand->final_callback([trackCommand, &config, &tleFilename, &trackIDs, &trackInterval, &trackDuration](void) {
+        try {
+            if (trackIDs.empty()) {
+                std::cerr << "Please provide at least one satellite's Norad ID." << std::endl;
+                std::cerr << trackCommand->help() << std::endl;
+                std::exit(1);
+            }
+            std::map<int, sattrack::Orbit> satellites;
+            loadTLEDatabase(tleFilename, satellites);
+
+            sattrack::Geodetic observer{
+                config.getLatitude() * (M_PI / 180.0),
+                config.getLongitude() * (M_PI / 180.0),
+                config.getAltitude() / 1000.0
+            };
+
+            // Verify all satellites exist
+            for (auto noradID : trackIDs) {
+                if (!satellites.contains(noradID)) {
+                    std::cerr << "Satellite with Norad ID " << noradID << " not found in the local TLE database." << std::endl;
+                    std::exit(1);
+                }
+            }
+
+            constexpr std::string_view headerFormat = "{:<20} {:>10} {:>5} {:>12} {:>10}";
+            constexpr std::string_view rowFormat = "{:<20} {:>7.2f} {:>3} {:>8.2f} {:>10.1f}";
+
+            std::cout << std::format(headerFormat, "Satellite", "Azimuth", "", "Elevation", "Range (km)") << std::endl;
+            std::cout << std::string(60, '-') << std::endl;
+
+            auto startTime = std::chrono::system_clock::now();
+            auto endTime = startTime + std::chrono::seconds(trackDuration);
+
+            while (std::chrono::system_clock::now() < endTime) {
+                auto now = std::chrono::system_clock::now();
+                double julianDate = sattrack::toJulianDate(now);
+
+                for (auto noradID : trackIDs) {
+                    auto& orbit = satellites[noradID];
+                    auto angles = sattrack::getLookAngles(orbit, observer, julianDate);
+
+                    double azDeg = angles.azimuthInRadians * (180.0 / M_PI);
+                    double elDeg = angles.elevationInRadians * (180.0 / M_PI);
+
+                    std::cout << std::format(rowFormat,
+                        orbit.getName().substr(0, 20),
+                        azDeg,
+                        azimuthToCompass(angles.azimuthInRadians),
+                        elDeg,
+                        angles.rangeInKilometers) << std::endl;
+                }
+
+                if (trackIDs.size() > 1) {
+                    std::cout << std::endl;
+                }
+
+                std::this_thread::sleep_for(std::chrono::seconds(static_cast<long>(trackInterval)));
+            }
+        } catch (const std::exception &err) {
+            std::cerr << err.what() << std::endl;
+            std::exit(1);
+        }
+    });
+
+    passesCommand->final_callback([passesCommand, &config, &tleFilename, &passesIDs](void) {
+        try {
+            if (passesIDs.empty()) {
+                std::cerr << "Please provide at least one satellite's Norad ID." << std::endl;
+                std::cerr << passesCommand->help() << std::endl;
+                std::exit(1);
+            }
+            std::map<int, sattrack::Orbit> satellites;
+            loadTLEDatabase(tleFilename, satellites);
+
+            sattrack::Geodetic observer{
+                config.getLatitude() * (M_PI / 180.0),
+                config.getLongitude() * (M_PI / 180.0),
+                config.getAltitude() / 1000.0
+            };
+
+            double minElevRad = config.getMinimumElevation() * (M_PI / 180.0);
+            auto searchDuration = std::chrono::hours(24 * config.getDays());
+
+            for (auto noradID : passesIDs) {
+                if (!satellites.contains(noradID)) {
+                    std::cerr << "Satellite with Norad ID " << noradID << " not found in the local TLE database." << std::endl;
+                    continue;
+                }
+                auto& orbit = satellites[noradID];
+
+                std::cout << "Passes for " << orbit.getName() << ":" << std::endl;
+                std::cout << std::endl;
+
+                auto searchTime = std::chrono::system_clock::now();
+                auto endTime = searchTime + searchDuration;
+                int passCount = 0;
+
+                constexpr std::string_view headerFormat = "{:^25} {:^25} {:^14} {:^12} {:^12} {:^10}";
+                constexpr std::string_view rowFormat = "{:^25} {:^25} {:^14} {:>6.2f} {:>3} {:>6.2f} {:>3} {:>6.2f}";
+
+                std::cout << std::format(headerFormat, "Rise", "Set", "Duration", "Rise Az", "Max Az", "Max Elev") << std::endl;
+                std::cout << std::format(headerFormat,
+                    std::string(25, '-'), std::string(25, '-'), std::string(14, '-'),
+                    std::string(12, '-'), std::string(12, '-'), std::string(10, '-')) << std::endl;
+
+                while (searchTime < endTime) {
+                    auto pass = sattrack::findNextPass(orbit, observer, minElevRad, searchTime);
+                    if (!pass.has_value()) {
+                        break;
+                    }
+
+                    passCount++;
+
+                    auto duration = pass->setTime - pass->riseTime;
+                    auto durationSecs = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+                    int durationMins = durationSecs / 60;
+                    int durationRemSecs = durationSecs % 60;
+
+                    auto riseSeconds = std::chrono::floor<std::chrono::seconds>(pass->riseTime);
+                    auto setSeconds = std::chrono::floor<std::chrono::seconds>(pass->setTime);
+
+                    double riseAzDeg = pass->riseAngles.azimuthInRadians * (180.0 / M_PI);
+                    double maxAzDeg = pass->maxAngles.azimuthInRadians * (180.0 / M_PI);
+                    double maxElDeg = pass->maxAngles.elevationInRadians * (180.0 / M_PI);
+
+                    std::cout << std::format(rowFormat,
+                        date::format("%F %T UTC", riseSeconds),
+                        date::format("%F %T UTC", setSeconds),
+                        std::format("{}m {}s", durationMins, durationRemSecs),
+                        riseAzDeg, azimuthToCompass(pass->riseAngles.azimuthInRadians),
+                        maxAzDeg, azimuthToCompass(pass->maxAngles.azimuthInRadians),
+                        maxElDeg) << std::endl;
+
+                    // Move past this pass
+                    searchTime = pass->setTime + std::chrono::minutes(1);
+                }
+
+                if (passCount == 0) {
+                    std::cout << "  No passes found. (findNextPass not yet implemented)" << std::endl;
+                }
                 std::cout << std::endl;
             }
         } catch (const std::exception &err) {

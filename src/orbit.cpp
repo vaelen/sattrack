@@ -262,29 +262,324 @@ Vec3 eciToECEF(const Vec3 &eci, double gst) {
     };
 }
 
+// WGS84 ellipsoid constants (used by multiple functions)
+constexpr double WGS84_A = 6378.137;              // Semi-major axis (km) - equatorial radius
+constexpr double WGS84_F = 1.0 / 298.257223563;   // Flattening
+constexpr double WGS84_E2 = WGS84_F * (2 - WGS84_F);  // Eccentricity squared ≈ 0.00669437999014
+
 // Convert ECEF coordinates to geodetic latitude, longitude, and altitude
 Geodetic ecefToGeodetic(const Vec3 &ecef) {
-    constexpr double a = 6378.137;            // WGS84 semi-major axis (km)
-    constexpr double f = 1.0 / 298.257223563; // flattening
-    constexpr double e2 = f * (2 - f);        // eccentricity squared
-    
     double x = ecef.x, y = ecef.y, z = ecef.z;
     double lon = std::atan2(y, x);
     double p = std::sqrt(x*x + y*y);
-    
+
     // Iterative latitude calculation (Bowring's method)
-    double lat = std::atan2(z, p * (1 - e2));  // initial guess
+    double lat = std::atan2(z, p * (1 - WGS84_E2));  // initial guess
     for (int i = 0; i < 10; ++i) {
         double sinLat = std::sin(lat);
-        double N = a / std::sqrt(1 - e2 * sinLat * sinLat);
-        lat = std::atan2(z + e2 * N * sinLat, p);
+        double N = WGS84_A / std::sqrt(1 - WGS84_E2 * sinLat * sinLat);
+        lat = std::atan2(z + WGS84_E2 * N * sinLat, p);
     }
-    
+
     double sinLat = std::sin(lat);
-    double N = a / std::sqrt(1 - e2 * sinLat * sinLat);
+    double N = WGS84_A / std::sqrt(1 - WGS84_E2 * sinLat * sinLat);
     double alt = p / std::cos(lat) - N;
-    
+
     return {lat, lon, alt};
+}
+
+// Convert geodetic coordinates to ECEF (Earth-Centered Earth-Fixed)
+// See documentation in orbit.hpp for detailed algorithm explanation
+Vec3 Geodetic::toECEF() const {
+    double sinLat = std::sin(latInRadians);
+    double cosLat = std::cos(latInRadians);
+    double sinLon = std::sin(lonInRadians);
+    double cosLon = std::cos(lonInRadians);
+
+    // Radius of curvature in the prime vertical
+    // This is the distance from the surface to the Z-axis along the ellipsoid normal
+    double N = WGS84_A / std::sqrt(1.0 - WGS84_E2 * sinLat * sinLat);
+
+    // ECEF coordinates
+    // The (1 - e²) factor in Z accounts for the ellipsoid's polar flattening
+    return {
+        (N + altInKilometers) * cosLat * cosLon,
+        (N + altInKilometers) * cosLat * sinLon,
+        (N * (1.0 - WGS84_E2) + altInKilometers) * sinLat
+    };
+}
+
+// Transform ECEF coordinates to ENU (East-North-Up) local tangent plane
+// See documentation in orbit.hpp for detailed algorithm explanation
+Vec3 ecefToENU(const Vec3& targetECEF, const Geodetic& observer) {
+    // Step 1: Get observer's ECEF position and compute difference vector
+    Vec3 observerECEF = observer.toECEF();
+    Vec3 diff = targetECEF - observerECEF;
+
+    // Step 2: Precompute trig values for rotation matrix
+    double sinLat = std::sin(observer.latInRadians);
+    double cosLat = std::cos(observer.latInRadians);
+    double sinLon = std::sin(observer.lonInRadians);
+    double cosLon = std::cos(observer.lonInRadians);
+
+    // Step 3: Apply rotation matrix (ECEF to ENU)
+    // This matrix rotates the ECEF frame to align with the local horizon:
+    //   - East points along the local latitude circle (toward increasing longitude)
+    //   - North points along the local meridian (toward the pole)
+    //   - Up points radially outward (normal to the ellipsoid)
+    double east  = -sinLon * diff.x + cosLon * diff.y;
+    double north = -sinLat * cosLon * diff.x - sinLat * sinLon * diff.y + cosLat * diff.z;
+    double up    =  cosLat * cosLon * diff.x + cosLat * sinLon * diff.y + sinLat * diff.z;
+
+    return {east, north, up};
+}
+
+// Compute look angles from observer to a target in ECEF coordinates
+LookAngles getLookAngles(const Vec3& satECEF, const Geodetic& observer) {
+    // Transform to local ENU coordinates
+    Vec3 enu = ecefToENU(satECEF, observer);
+
+    // Compute slant range (straight-line distance)
+    double range = enu.magnitude();
+
+    // Compute elevation angle
+    // elevation = arcsin(Up / range)
+    // When satellite is directly overhead, Up = range, so elevation = π/2
+    // When satellite is on horizon, Up = 0, so elevation = 0
+    double elevation = std::asin(enu.z / range);
+
+    // Compute azimuth angle
+    // azimuth = arctan2(East, North)
+    // This gives: 0 = North, π/2 = East, π = South, -π/2 = West
+    double azimuth = std::atan2(enu.x, enu.y);
+
+    // Normalize azimuth to [0, 2π)
+    if (azimuth < 0) {
+        azimuth += 2.0 * std::numbers::pi;
+    }
+
+    return {azimuth, elevation, range};
+}
+
+// Compute look angles from observer to a satellite at a specific time
+LookAngles getLookAngles(const Orbit& orbit, const Geodetic& observer, double julianDate) {
+    // Get true anomaly at the requested time
+    double trueAnomaly = orbit.getTrueAnomalyAtTime(julianDate);
+
+    // Get ECI coordinates
+    Vec3 eci = orbit.getECI(trueAnomaly);
+
+    // Convert ECI to ECEF using Greenwich Sidereal Time
+    double gst = gmst(julianDate);
+    Vec3 ecef = eciToECEF(eci, gst);
+
+    // Compute look angles
+    return getLookAngles(ecef, observer);
+}
+
+// Check visibility based on look angles
+bool isVisible(const LookAngles& angles, double minElevationInRadians) {
+    return angles.elevationInRadians >= minElevationInRadians;
+}
+
+// Check visibility of a satellite at a specific time
+bool isVisible(const Orbit& orbit, const Geodetic& observer,
+               double julianDate, double minElevationInRadians) {
+    LookAngles angles = getLookAngles(orbit, observer, julianDate);
+    return isVisible(angles, minElevationInRadians);
+}
+
+// Helper: Get elevation at a specific time
+static double getElevationAtTime(const Orbit& orbit, const Geodetic& observer, time_point t) {
+    double jd = toJulianDate(t);
+    LookAngles angles = getLookAngles(orbit, observer, jd);
+    return angles.elevationInRadians;
+}
+
+// Helper: Binary search to find precise threshold crossing time
+// Returns the time when elevation crosses the threshold
+// 'rising' indicates if we're looking for a rise (true) or set (false)
+static time_point binarySearchCrossing(
+    const Orbit& orbit,
+    const Geodetic& observer,
+    double threshold,
+    time_point low,
+    time_point high,
+    bool rising) {
+
+    using namespace std::chrono;
+
+    // Refine to within 1 second
+    while (duration_cast<seconds>(high - low).count() > 1) {
+        time_point mid = low + (high - low) / 2;
+        double elev = getElevationAtTime(orbit, observer, mid);
+
+        bool aboveThreshold = elev >= threshold;
+
+        if (rising) {
+            // Looking for rise: below threshold -> above threshold
+            // If mid is above, the crossing is before mid
+            if (aboveThreshold) {
+                high = mid;
+            } else {
+                low = mid;
+            }
+        } else {
+            // Looking for set: above threshold -> below threshold
+            // If mid is above, the crossing is after mid
+            if (aboveThreshold) {
+                low = mid;
+            } else {
+                high = mid;
+            }
+        }
+    }
+
+    return rising ? high : low;
+}
+
+// Helper: Golden section search to find maximum elevation time
+// Returns the time when elevation is at maximum between low and high
+static time_point goldenSectionSearchMax(
+    const Orbit& orbit,
+    const Geodetic& observer,
+    time_point low,
+    time_point high) {
+
+    using namespace std::chrono;
+
+    constexpr double PHI = 1.618033988749895;  // Golden ratio
+    constexpr double RESPHI = 2.0 - PHI;       // 1/phi
+
+    auto duration = high - low;
+    time_point x1 = low + duration_cast<system_clock::duration>(duration * RESPHI);
+    time_point x2 = high - duration_cast<system_clock::duration>(duration * RESPHI);
+
+    double f1 = getElevationAtTime(orbit, observer, x1);
+    double f2 = getElevationAtTime(orbit, observer, x2);
+
+    // Refine to within 1 second
+    while (duration_cast<seconds>(high - low).count() > 1) {
+        if (f1 > f2) {
+            high = x2;
+            x2 = x1;
+            f2 = f1;
+            duration = high - low;
+            x1 = low + duration_cast<system_clock::duration>(duration * RESPHI);
+            f1 = getElevationAtTime(orbit, observer, x1);
+        } else {
+            low = x1;
+            x1 = x2;
+            f1 = f2;
+            duration = high - low;
+            x2 = high - duration_cast<system_clock::duration>(duration * RESPHI);
+            f2 = getElevationAtTime(orbit, observer, x2);
+        }
+    }
+
+    // Return the midpoint
+    return low + (high - low) / 2;
+}
+
+// Find the next satellite pass over an observer's location
+std::optional<PassInfo> findNextPass(
+    const Orbit& orbit,
+    const Geodetic& observer,
+    double minElevationInRadians,
+    time_point startTime) {
+
+    using namespace std::chrono;
+
+    // Search parameters
+    constexpr auto COARSE_STEP = seconds(60);        // 60-second steps for coarse search
+    constexpr auto MAX_SEARCH = hours(48);           // Search up to 48 hours ahead
+
+    auto searchEnd = startTime + MAX_SEARCH;
+    auto currentTime = startTime;
+
+    // Track visibility state
+    bool wasVisible = isVisible(orbit, observer, toJulianDate(currentTime), minElevationInRadians);
+
+    // If we start during a pass, skip to the end of it first
+    if (wasVisible) {
+        while (currentTime < searchEnd) {
+            currentTime += COARSE_STEP;
+            bool nowVisible = isVisible(orbit, observer, toJulianDate(currentTime), minElevationInRadians);
+            if (!nowVisible) {
+                wasVisible = false;
+                break;
+            }
+        }
+        if (wasVisible) {
+            // Still visible after 48 hours - probably a GEO satellite or error
+            return std::nullopt;
+        }
+    }
+
+    // Coarse search: find when satellite rises above threshold
+    time_point coarseRise, coarseSet;
+    bool foundRise = false;
+    bool foundSet = false;
+
+    while (currentTime < searchEnd) {
+        currentTime += COARSE_STEP;
+        bool nowVisible = isVisible(orbit, observer, toJulianDate(currentTime), minElevationInRadians);
+
+        if (!wasVisible && nowVisible) {
+            // Found rise
+            coarseRise = currentTime - COARSE_STEP;
+            foundRise = true;
+            wasVisible = true;
+        } else if (wasVisible && !nowVisible) {
+            // Found set
+            coarseSet = currentTime;
+            foundSet = true;
+            break;
+        }
+
+        wasVisible = nowVisible;
+    }
+
+    // Handle edge cases
+    if (!foundRise) {
+        return std::nullopt;  // No pass found in search window
+    }
+
+    if (!foundSet) {
+        // Pass started but didn't end - use search end as approximate set
+        coarseSet = searchEnd;
+    }
+
+    // Binary search refinement for precise rise time
+    time_point preciseRise = binarySearchCrossing(
+        orbit, observer, minElevationInRadians,
+        coarseRise, coarseRise + COARSE_STEP, true);
+
+    // Binary search refinement for precise set time
+    time_point preciseSet = binarySearchCrossing(
+        orbit, observer, minElevationInRadians,
+        coarseSet - COARSE_STEP, coarseSet, false);
+
+    // Golden section search for maximum elevation time
+    time_point maxTime = goldenSectionSearchMax(orbit, observer, preciseRise, preciseSet);
+
+    // Compute look angles at each key time
+    double riseJD = toJulianDate(preciseRise);
+    double maxJD = toJulianDate(maxTime);
+    double setJD = toJulianDate(preciseSet);
+
+    LookAngles riseAngles = getLookAngles(orbit, observer, riseJD);
+    LookAngles maxAngles = getLookAngles(orbit, observer, maxJD);
+    LookAngles setAngles = getLookAngles(orbit, observer, setJD);
+
+    return PassInfo{
+        preciseRise,
+        maxTime,
+        preciseSet,
+        riseAngles,
+        maxAngles,
+        setAngles
+    };
 }
 
 // Get geodetic location (lat, lon, alt) of the satellite at a given time

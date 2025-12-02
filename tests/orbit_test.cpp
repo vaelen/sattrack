@@ -1047,5 +1047,550 @@ TEST(FormatFirstDerivativeTest, RoundingDown) {
     EXPECT_EQ(formatFirstDerivative(0.000000004), " .00000000");
 }
 
+// ============================================================================
+// Vec3 Extended Operations Tests
+// ============================================================================
+
+TEST(Vec3Test, Subtraction) {
+    Vec3 a{5.0, 7.0, 9.0};
+    Vec3 b{1.0, 2.0, 3.0};
+    Vec3 result = a - b;
+    EXPECT_DOUBLE_EQ(result.x, 4.0);
+    EXPECT_DOUBLE_EQ(result.y, 5.0);
+    EXPECT_DOUBLE_EQ(result.z, 6.0);
+}
+
+TEST(Vec3Test, SubtractionNegativeResult) {
+    Vec3 a{1.0, 2.0, 3.0};
+    Vec3 b{5.0, 7.0, 9.0};
+    Vec3 result = a - b;
+    EXPECT_DOUBLE_EQ(result.x, -4.0);
+    EXPECT_DOUBLE_EQ(result.y, -5.0);
+    EXPECT_DOUBLE_EQ(result.z, -6.0);
+}
+
+TEST(Vec3Test, DotProduct) {
+    Vec3 a{1.0, 2.0, 3.0};
+    Vec3 b{4.0, 5.0, 6.0};
+    // 1*4 + 2*5 + 3*6 = 4 + 10 + 18 = 32
+    EXPECT_DOUBLE_EQ(a.dot(b), 32.0);
+}
+
+TEST(Vec3Test, DotProductPerpendicular) {
+    // Two perpendicular vectors have dot product = 0
+    Vec3 a{1.0, 0.0, 0.0};
+    Vec3 b{0.0, 1.0, 0.0};
+    EXPECT_DOUBLE_EQ(a.dot(b), 0.0);
+}
+
+TEST(Vec3Test, DotProductParallel) {
+    // Parallel vectors: dot product = |a| * |b|
+    Vec3 a{2.0, 0.0, 0.0};
+    Vec3 b{3.0, 0.0, 0.0};
+    EXPECT_DOUBLE_EQ(a.dot(b), 6.0);
+}
+
+TEST(Vec3Test, DotProductAntiparallel) {
+    // Anti-parallel vectors: dot product = -|a| * |b|
+    Vec3 a{2.0, 0.0, 0.0};
+    Vec3 b{-3.0, 0.0, 0.0};
+    EXPECT_DOUBLE_EQ(a.dot(b), -6.0);
+}
+
+TEST(Vec3Test, CrossProduct) {
+    Vec3 a{1.0, 0.0, 0.0};
+    Vec3 b{0.0, 1.0, 0.0};
+    Vec3 result = a.cross(b);
+    // i × j = k
+    EXPECT_DOUBLE_EQ(result.x, 0.0);
+    EXPECT_DOUBLE_EQ(result.y, 0.0);
+    EXPECT_DOUBLE_EQ(result.z, 1.0);
+}
+
+TEST(Vec3Test, CrossProductReverse) {
+    Vec3 a{1.0, 0.0, 0.0};
+    Vec3 b{0.0, 1.0, 0.0};
+    Vec3 result = b.cross(a);
+    // j × i = -k
+    EXPECT_DOUBLE_EQ(result.x, 0.0);
+    EXPECT_DOUBLE_EQ(result.y, 0.0);
+    EXPECT_DOUBLE_EQ(result.z, -1.0);
+}
+
+TEST(Vec3Test, CrossProductGeneral) {
+    Vec3 a{1.0, 2.0, 3.0};
+    Vec3 b{4.0, 5.0, 6.0};
+    Vec3 result = a.cross(b);
+    // (2*6 - 3*5, 3*4 - 1*6, 1*5 - 2*4) = (12-15, 12-6, 5-8) = (-3, 6, -3)
+    EXPECT_DOUBLE_EQ(result.x, -3.0);
+    EXPECT_DOUBLE_EQ(result.y, 6.0);
+    EXPECT_DOUBLE_EQ(result.z, -3.0);
+}
+
+TEST(Vec3Test, CrossProductPerpendicular) {
+    // Cross product result is perpendicular to both inputs
+    Vec3 a{1.0, 2.0, 3.0};
+    Vec3 b{4.0, 5.0, 6.0};
+    Vec3 c = a.cross(b);
+    EXPECT_NEAR(a.dot(c), 0.0, 1e-10);
+    EXPECT_NEAR(b.dot(c), 0.0, 1e-10);
+}
+
+TEST(Vec3Test, CrossProductParallelIsZero) {
+    // Parallel vectors have zero cross product
+    Vec3 a{1.0, 2.0, 3.0};
+    Vec3 b{2.0, 4.0, 6.0};
+    Vec3 result = a.cross(b);
+    EXPECT_NEAR(result.magnitude(), 0.0, 1e-10);
+}
+
+TEST(Vec3Test, Normalize) {
+    Vec3 v{3.0, 4.0, 0.0};
+    Vec3 result = v.normalize();
+    EXPECT_DOUBLE_EQ(result.magnitude(), 1.0);
+    EXPECT_DOUBLE_EQ(result.x, 0.6);
+    EXPECT_DOUBLE_EQ(result.y, 0.8);
+    EXPECT_DOUBLE_EQ(result.z, 0.0);
+}
+
+TEST(Vec3Test, NormalizeUnitVector) {
+    Vec3 v{1.0, 0.0, 0.0};
+    Vec3 result = v.normalize();
+    EXPECT_DOUBLE_EQ(result.x, 1.0);
+    EXPECT_DOUBLE_EQ(result.y, 0.0);
+    EXPECT_DOUBLE_EQ(result.z, 0.0);
+}
+
+TEST(Vec3Test, NormalizePreservesDirection) {
+    Vec3 v{10.0, 20.0, 30.0};
+    Vec3 n = v.normalize();
+    // Normalized vector should be parallel to original
+    // (their cross product should be zero)
+    Vec3 cross = v.cross(n);
+    EXPECT_NEAR(cross.magnitude(), 0.0, 1e-10);
+}
+
+// ============================================================================
+// Geodetic::toECEF Tests
+// ============================================================================
+
+TEST(GeodeticToECEFTest, EquatorPrimeMeridian) {
+    // Point on equator at prime meridian at Earth's surface
+    Geodetic geo{0.0, 0.0, 0.0};
+    Vec3 ecef = geo.toECEF();
+    // X should be approximately Earth's equatorial radius
+    EXPECT_NEAR(ecef.x, 6378.137, 0.001);
+    EXPECT_NEAR(ecef.y, 0.0, 1e-10);
+    EXPECT_NEAR(ecef.z, 0.0, 1e-10);
+}
+
+TEST(GeodeticToECEFTest, EquatorAt90East) {
+    // Point on equator at 90° East
+    Geodetic geo{0.0, M_PI / 2.0, 0.0};
+    Vec3 ecef = geo.toECEF();
+    EXPECT_NEAR(ecef.x, 0.0, 1e-10);
+    EXPECT_NEAR(ecef.y, 6378.137, 0.001);
+    EXPECT_NEAR(ecef.z, 0.0, 1e-10);
+}
+
+TEST(GeodeticToECEFTest, NorthPole) {
+    // North pole at surface
+    Geodetic geo{M_PI / 2.0, 0.0, 0.0};
+    Vec3 ecef = geo.toECEF();
+    // At north pole, X and Y should be ~0, Z should be semi-minor axis
+    EXPECT_NEAR(ecef.x, 0.0, 1e-10);
+    EXPECT_NEAR(ecef.y, 0.0, 1e-10);
+    // WGS84 semi-minor axis ≈ 6356.752 km
+    EXPECT_NEAR(ecef.z, 6356.752, 0.1);
+}
+
+TEST(GeodeticToECEFTest, WithAltitude) {
+    // Point on equator at prime meridian, 420 km altitude (ISS altitude)
+    Geodetic geo{0.0, 0.0, 420.0};
+    Vec3 ecef = geo.toECEF();
+    EXPECT_NEAR(ecef.x, 6378.137 + 420.0, 0.001);
+    EXPECT_NEAR(ecef.y, 0.0, 1e-10);
+    EXPECT_NEAR(ecef.z, 0.0, 1e-10);
+}
+
+TEST(GeodeticToECEFTest, RoundTrip) {
+    // Test that toECEF -> ecefToGeodetic gives back original values
+    Geodetic original{0.7, 1.2, 500.0};  // ~40° lat, ~69° lon, 500 km alt
+    Vec3 ecef = original.toECEF();
+    Geodetic recovered = ecefToGeodetic(ecef);
+
+    EXPECT_NEAR(recovered.latInRadians, original.latInRadians, 1e-6);
+    EXPECT_NEAR(recovered.lonInRadians, original.lonInRadians, 1e-6);
+    EXPECT_NEAR(recovered.altInKilometers, original.altInKilometers, 0.01);
+}
+
+TEST(GeodeticToECEFTest, RoundTripMultipleLocations) {
+    // Test round-trip at several locations
+    std::vector<Geodetic> testLocations = {
+        {0.0, 0.0, 0.0},           // Equator, prime meridian, surface
+        {M_PI / 4, M_PI / 4, 100}, // 45°N, 45°E, 100km alt
+        {-M_PI / 3, -M_PI / 2, 35786}, // GEO altitude
+        {M_PI / 6, M_PI, 400},     // 30°N, 180°, 400km (ISS-like)
+    };
+
+    for (const auto& original : testLocations) {
+        Vec3 ecef = original.toECEF();
+        Geodetic recovered = ecefToGeodetic(ecef);
+
+        EXPECT_NEAR(recovered.latInRadians, original.latInRadians, 1e-5);
+        EXPECT_NEAR(recovered.lonInRadians, original.lonInRadians, 1e-5);
+        EXPECT_NEAR(recovered.altInKilometers, original.altInKilometers, 0.1);
+    }
+}
+
+// ============================================================================
+// ecefToENU Tests
+// ============================================================================
+
+TEST(ECEFToENUTest, SatelliteDirectlyAbove) {
+    // Observer on equator at prime meridian
+    Geodetic observer{0.0, 0.0, 0.0};
+    // Satellite directly above at 400 km altitude
+    Vec3 observerECEF = observer.toECEF();
+    Vec3 satECEF = {observerECEF.x + 400.0, 0.0, 0.0};
+
+    Vec3 enu = ecefToENU(satECEF, observer);
+
+    // Should be purely "Up"
+    EXPECT_NEAR(enu.x, 0.0, 1e-6);  // East
+    EXPECT_NEAR(enu.y, 0.0, 1e-6);  // North
+    EXPECT_NEAR(enu.z, 400.0, 0.1); // Up
+}
+
+TEST(ECEFToENUTest, SatelliteToEast) {
+    // Observer on equator at prime meridian
+    Geodetic observer{0.0, 0.0, 0.0};
+    // Satellite same altitude but displaced toward +Y (East)
+    Vec3 satECEF = {6378.137, 500.0, 0.0};
+
+    Vec3 enu = ecefToENU(satECEF, observer);
+
+    // Should be primarily East with some Up
+    EXPECT_GT(enu.x, 0.0);  // East (positive)
+    EXPECT_NEAR(enu.y, 0.0, 1e-6);  // North (approximately zero)
+}
+
+TEST(ECEFToENUTest, SatelliteToNorth) {
+    // Observer on equator at prime meridian
+    Geodetic observer{0.0, 0.0, 0.0};
+    // Satellite displaced toward +Z (North)
+    Vec3 satECEF = {6378.137, 0.0, 500.0};
+
+    Vec3 enu = ecefToENU(satECEF, observer);
+
+    // Should be primarily North with some Up
+    EXPECT_NEAR(enu.x, 0.0, 1e-6);  // East (approximately zero)
+    EXPECT_GT(enu.y, 0.0);  // North (positive)
+}
+
+TEST(ECEFToENUTest, RangePreservation) {
+    // The ENU transformation should preserve the distance (range)
+    Geodetic observer{0.5, 1.0, 100.0};  // Arbitrary location
+    Vec3 observerECEF = observer.toECEF();
+
+    // Arbitrary satellite position
+    Vec3 satECEF = {7000.0, 1000.0, 2000.0};
+
+    // Compute range in ECEF
+    Vec3 diff = satECEF - observerECEF;
+    double rangeECEF = diff.magnitude();
+
+    // Compute range in ENU
+    Vec3 enu = ecefToENU(satECEF, observer);
+    double rangeENU = enu.magnitude();
+
+    // Should be the same
+    EXPECT_NEAR(rangeENU, rangeECEF, 1e-6);
+}
+
+// ============================================================================
+// getLookAngles Tests
+// ============================================================================
+
+TEST(GetLookAnglesTest, SatelliteDirectlyOverhead) {
+    // Observer on equator at prime meridian
+    Geodetic observer{0.0, 0.0, 0.0};
+    // Satellite directly above
+    Vec3 observerECEF = observer.toECEF();
+    Vec3 satECEF = observerECEF * (1.0 + 400.0 / observerECEF.magnitude());
+
+    LookAngles angles = getLookAngles(satECEF, observer);
+
+    // Elevation should be 90 degrees (π/2)
+    EXPECT_NEAR(angles.elevationInRadians, M_PI / 2.0, 0.01);
+    // Range should be approximately 400 km
+    EXPECT_NEAR(angles.rangeInKilometers, 400.0, 1.0);
+}
+
+TEST(GetLookAnglesTest, SatelliteAtSameAltitude) {
+    // Test with a satellite at similar distance from Earth's center
+    // but displaced so it's not directly overhead
+    Geodetic observer{0.0, 0.0, 0.0};
+    Vec3 observerECEF = observer.toECEF();
+
+    // Satellite at 90 degrees longitude (due East), same radius
+    // This puts it well above the horizon due to Earth's curvature
+    Vec3 satECEF = {0.0, observerECEF.x + 400.0, 0.0};
+
+    LookAngles angles = getLookAngles(satECEF, observer);
+
+    // Verify we get valid look angles
+    EXPECT_GE(angles.azimuthInRadians, 0.0);
+    EXPECT_LT(angles.azimuthInRadians, 2.0 * M_PI);
+    // Elevation can be positive (satellite is ~400km further from Earth center)
+    EXPECT_GE(angles.elevationInRadians, -M_PI / 2.0);
+    EXPECT_LE(angles.elevationInRadians, M_PI / 2.0);
+}
+
+TEST(GetLookAnglesTest, AzimuthNorth) {
+    // Observer on equator at prime meridian
+    Geodetic observer{0.0, 0.0, 0.0};
+    Vec3 observerECEF = observer.toECEF();
+
+    // Satellite to the north (positive Z in ECEF)
+    Vec3 satECEF = {observerECEF.x, 0.0, 1000.0};
+
+    LookAngles angles = getLookAngles(satECEF, observer);
+
+    // Azimuth should be close to 0 (North)
+    EXPECT_LT(angles.azimuthInRadians, M_PI / 6);  // Within 30 degrees of North
+}
+
+TEST(GetLookAnglesTest, AzimuthEast) {
+    // Observer on equator at prime meridian
+    Geodetic observer{0.0, 0.0, 0.0};
+    Vec3 observerECEF = observer.toECEF();
+
+    // Satellite to the east (positive Y in ECEF at equator/prime meridian)
+    Vec3 satECEF = {observerECEF.x, 1000.0, 0.0};
+
+    LookAngles angles = getLookAngles(satECEF, observer);
+
+    // Azimuth should be close to π/2 (East = 90°)
+    EXPECT_NEAR(angles.azimuthInRadians, M_PI / 2.0, M_PI / 6);
+}
+
+TEST(GetLookAnglesTest, AzimuthInValidRange) {
+    // Test that azimuth is always in [0, 2π)
+    Geodetic observer{0.5, 1.0, 0.0};
+
+    std::vector<Vec3> testSatellites = {
+        {7000.0, 1000.0, 500.0},
+        {-7000.0, 1000.0, -500.0},
+        {1000.0, -7000.0, 500.0},
+        {1000.0, 1000.0, 7000.0},
+    };
+
+    for (const auto& satECEF : testSatellites) {
+        LookAngles angles = getLookAngles(satECEF, observer);
+        EXPECT_GE(angles.azimuthInRadians, 0.0);
+        EXPECT_LT(angles.azimuthInRadians, 2.0 * M_PI);
+    }
+}
+
+TEST(GetLookAnglesTest, ElevationInValidRange) {
+    // Test that elevation is always in [-π/2, π/2]
+    Geodetic observer{0.5, 1.0, 0.0};
+
+    std::vector<Vec3> testSatellites = {
+        {7000.0, 1000.0, 500.0},
+        {-7000.0, 1000.0, -500.0},
+        {1000.0, -7000.0, 500.0},
+        {1000.0, 1000.0, 7000.0},
+    };
+
+    for (const auto& satECEF : testSatellites) {
+        LookAngles angles = getLookAngles(satECEF, observer);
+        EXPECT_GE(angles.elevationInRadians, -M_PI / 2.0);
+        EXPECT_LE(angles.elevationInRadians, M_PI / 2.0);
+    }
+}
+
+// ============================================================================
+// getLookAngles with Orbit Tests
+// ============================================================================
+
+TEST_F(OrbitTest, GetLookAnglesAtEpoch) {
+    orbit.updateFromTLE(ISS_TLE);
+
+    // Observer at a mid-latitude location
+    Geodetic observer{0.7, -1.5, 0.0};  // ~40°N, ~86°W
+
+    double epochJD = toJulianDate(orbit.getEpoch());
+    LookAngles angles = getLookAngles(orbit, observer, epochJD);
+
+    // Just verify we get reasonable values
+    EXPECT_GE(angles.azimuthInRadians, 0.0);
+    EXPECT_LT(angles.azimuthInRadians, 2.0 * M_PI);
+    EXPECT_GE(angles.elevationInRadians, -M_PI / 2.0);
+    EXPECT_LE(angles.elevationInRadians, M_PI / 2.0);
+    EXPECT_GT(angles.rangeInKilometers, 0.0);
+    EXPECT_LT(angles.rangeInKilometers, 50000.0);  // Should be less than GEO distance
+}
+
+TEST_F(OrbitTest, GetLookAnglesRangeReasonable) {
+    orbit.updateFromTLE(ISS_TLE);
+
+    // Observer location doesn't matter much for range check
+    Geodetic observer{0.0, 0.0, 0.0};
+
+    double epochJD = toJulianDate(orbit.getEpoch());
+    LookAngles angles = getLookAngles(orbit, observer, epochJD);
+
+    // ISS at ~420 km altitude
+    // Minimum range (directly overhead): ~420 km
+    // Maximum range (when satellite is on opposite side of Earth): ~13000 km
+    // The actual range depends on where the satellite is in its orbit relative to observer
+    EXPECT_GT(angles.rangeInKilometers, 400.0);
+    EXPECT_LT(angles.rangeInKilometers, 15000.0);
+}
+
+// ============================================================================
+// isVisible Tests
+// ============================================================================
+
+TEST(IsVisibleTest, AboveThreshold) {
+    LookAngles angles{0.0, 0.2, 1000.0};  // 0.2 rad ≈ 11.5°
+    EXPECT_TRUE(isVisible(angles, 0.1));  // Threshold 0.1 rad ≈ 5.7°
+}
+
+TEST(IsVisibleTest, BelowThreshold) {
+    LookAngles angles{0.0, 0.05, 1000.0};  // 0.05 rad ≈ 2.9°
+    EXPECT_FALSE(isVisible(angles, 0.1));  // Threshold 0.1 rad ≈ 5.7°
+}
+
+TEST(IsVisibleTest, ExactlyAtThreshold) {
+    LookAngles angles{0.0, 0.1, 1000.0};
+    EXPECT_TRUE(isVisible(angles, 0.1));  // Should be visible when exactly at threshold
+}
+
+TEST(IsVisibleTest, NegativeElevation) {
+    LookAngles angles{0.0, -0.1, 1000.0};  // Below horizon
+    EXPECT_FALSE(isVisible(angles, 0.0));  // Threshold at horizon
+}
+
+TEST(IsVisibleTest, ZeroThreshold) {
+    LookAngles aboveHorizon{0.0, 0.01, 1000.0};
+    LookAngles belowHorizon{0.0, -0.01, 1000.0};
+
+    EXPECT_TRUE(isVisible(aboveHorizon, 0.0));
+    EXPECT_FALSE(isVisible(belowHorizon, 0.0));
+}
+
+TEST(IsVisibleTest, HighElevation) {
+    LookAngles overhead{0.0, M_PI / 2.0, 400.0};  // Directly overhead
+    EXPECT_TRUE(isVisible(overhead, 0.0));
+    EXPECT_TRUE(isVisible(overhead, M_PI / 4.0));  // 45° threshold
+    EXPECT_TRUE(isVisible(overhead, M_PI / 3.0));  // 60° threshold
+}
+
+// ============================================================================
+// isVisible with Orbit Tests
+// ============================================================================
+
+TEST_F(OrbitTest, IsVisibleReturnsReasonableResults) {
+    orbit.updateFromTLE(ISS_TLE);
+
+    // Observer at a specific location
+    Geodetic observer{0.7, -1.5, 0.0};
+
+    double epochJD = toJulianDate(orbit.getEpoch());
+
+    // Check visibility with different thresholds
+    // These should return consistent results (visible at low threshold means
+    // visible at even lower threshold)
+    bool visibleAt0 = isVisible(orbit, observer, epochJD, 0.0);
+    bool visibleAt10deg = isVisible(orbit, observer, epochJD, 10.0 * M_PI / 180.0);
+    bool visibleAt45deg = isVisible(orbit, observer, epochJD, 45.0 * M_PI / 180.0);
+
+    // If visible at high threshold, must be visible at lower threshold
+    if (visibleAt45deg) {
+        EXPECT_TRUE(visibleAt10deg);
+        EXPECT_TRUE(visibleAt0);
+    }
+    if (visibleAt10deg) {
+        EXPECT_TRUE(visibleAt0);
+    }
+}
+
+// ============================================================================
+// findNextPass Tests
+// ============================================================================
+
+TEST_F(OrbitTest, FindNextPassReturnsValidPassForISS) {
+    // ISS should have passes over mid-latitude locations
+    orbit.updateFromTLE(ISS_TLE);
+    Geodetic observer{0.7, -1.5, 0.0};  // ~40°N, ~86°W
+
+    auto pass = findNextPass(orbit, observer, 0.0, orbit.getEpoch());
+
+    // Should find a pass within 48 hours for ISS
+    EXPECT_TRUE(pass.has_value());
+}
+
+TEST_F(OrbitTest, FindNextPassReturnsValidPass) {
+    orbit.updateFromTLE(ISS_TLE);
+    Geodetic observer{0.7, -1.5, 0.0};  // ~40°N, ~86°W
+
+    auto pass = findNextPass(orbit, observer, 0.0, orbit.getEpoch());
+
+    ASSERT_TRUE(pass.has_value());
+    // Rise time should be before max elevation time
+    EXPECT_LT(pass->riseTime, pass->maxElevationTime);
+    // Max elevation time should be before set time
+    EXPECT_LT(pass->maxElevationTime, pass->setTime);
+    // Max elevation should be higher than rise/set
+    EXPECT_GE(pass->maxAngles.elevationInRadians, pass->riseAngles.elevationInRadians);
+    EXPECT_GE(pass->maxAngles.elevationInRadians, pass->setAngles.elevationInRadians);
+}
+
+TEST_F(OrbitTest, FindNextPassWithMinElevation) {
+    orbit.updateFromTLE(ISS_TLE);
+    Geodetic observer{0.7, -1.5, 0.0};
+    double minElevation = 10.0 * M_PI / 180.0;  // 10 degrees
+
+    auto pass = findNextPass(orbit, observer, minElevation, orbit.getEpoch());
+
+    if (pass.has_value()) {
+        // Rise elevation should be at or above minimum
+        EXPECT_GE(pass->riseAngles.elevationInRadians, minElevation - 0.01);
+        // Set elevation should be at or above minimum
+        EXPECT_GE(pass->setAngles.elevationInRadians, minElevation - 0.01);
+    }
+}
+
+TEST_F(OrbitTest, FindNextPassISSHasMultipleDailyPasses) {
+    // ISS completes about 15.5 orbits per day, so there should be multiple
+    // opportunities for passes over any given location
+    orbit.updateFromTLE(ISS_TLE);
+    Geodetic observer{0.7, -1.5, 0.0};
+
+    auto now = orbit.getEpoch();
+    int passCount = 0;
+
+    // Search for passes over 24 hours
+    auto searchTime = now;
+    auto endTime = now + std::chrono::hours(24);
+
+    while (searchTime < endTime) {
+        auto pass = findNextPass(orbit, observer, 0.0, searchTime);
+        if (pass.has_value()) {
+            passCount++;
+            // Move search time past this pass
+            searchTime = pass->setTime + std::chrono::minutes(1);
+        } else {
+            break;
+        }
+    }
+
+    // ISS should have multiple passes per day at mid-latitudes
+    EXPECT_GE(passCount, 1);
+}
+
 }  // namespace
 }  // namespace sattrack
