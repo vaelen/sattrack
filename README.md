@@ -36,7 +36,7 @@ SatTrack is a command-line application built using C++20. I wrote it largely as 
 
 I used Claude Code to help speed up my implementation of SatTrack by helping me maintain my build scripts, write test cases, update documentation, and perform research on calculations and C++20 features that I wasn't familiar with, but most of the actual code was written by me.
 
-Although I wrote the initial [Keplerian](https://en.wikipedia.org/wiki/Kepler_orbit) propagation code by hand and learned a lot from doing so, when I decided to move to [SGP4/SDP4](https://en.wikipedia.org/wiki/Simplified_perturbations_models) to improve pass prediction accuracy I had Claude port the SGP4/SDP4 [reference implementation](https://celestrak.org/software/vallado-sw.php) published by Celestrak rather than writing it myself. I had Claude port the code rather than using an off-the-shelf library because I wanted tighter integration with my other code and with the C++20 standard library.
+Although I wrote the initial [Keplerian](https://en.wikipedia.org/wiki/Kepler_orbit) propagation code by hand and learned a lot from doing so, when I decided to move to [SGP4/SDP4](https://en.wikipedia.org/wiki/Simplified_perturbations_models) to improve pass prediction accuracy I had Claude port the SGP4/SDP4 [reference implementation](https://celestrak.org/software/vallado-sw.php) published by Celestrak rather than writing it myself. I didn't use an off-the-shelf library because I wanted tighter integration with my other code and with the C++20 standard library.
 
 ## Data sources
 
