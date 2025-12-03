@@ -4,7 +4,7 @@
  */
 
 #include <gtest/gtest.h>
-#include <sattrack/orbit.hpp>
+#include <sattrack/satellite.hpp>
 
 #include <chrono>
 #include <cmath>

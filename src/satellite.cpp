@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include <sattrack/orbit.hpp>
+#include <sattrack/satellite.hpp>
 
 #include <charconv>
 #include <chrono>

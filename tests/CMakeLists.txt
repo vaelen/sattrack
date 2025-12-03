@@ -9,17 +9,17 @@ include_directories(
 
 # Test source files (shared library sources, excluding main)
 set(LIB_SOURCES
-    ${CMAKE_SOURCE_DIR}/src/orbit.cpp
+    ${CMAKE_SOURCE_DIR}/src/satellite.cpp
     ${CMAKE_SOURCE_DIR}/src/sgp4.cpp
 )
 
-# Orbit tests
-add_executable(orbit_test
-    orbit_test.cpp
+# Satellite tests
+add_executable(satellite_test
+    satellite_test.cpp
     ${LIB_SOURCES}
 )
 
-target_link_libraries(orbit_test
+target_link_libraries(satellite_test
     GTest::gtest
     GTest::gtest_main
 )
@@ -39,5 +39,5 @@ target_link_libraries(celestrak_test
 
 # Register tests with CTest
 include(GoogleTest)
-gtest_discover_tests(orbit_test)
+gtest_discover_tests(satellite_test)
 gtest_discover_tests(celestrak_test)

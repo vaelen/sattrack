@@ -77,7 +77,7 @@ set(SOURCES
     src/n2yo.cpp
     src/celestrak.cpp
     src/config.cpp
-    src/orbit.cpp
+    src/satellite.cpp
     src/sgp4.cpp
     # Add more source files here as you create them
 )

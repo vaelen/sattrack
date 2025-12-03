@@ -6,8 +6,8 @@
  * See: https://celestrak.org/software/vallado-sw.php
  */
 
-#ifndef __SATTRACK_ORBIT_HPP
-#define __SATTRACK_ORBIT_HPP
+#ifndef __SATTRACK_SATELLITE_HPP
+#define __SATTRACK_SATELLITE_HPP
 
 #include <sattrack/sgp4.hpp>
 

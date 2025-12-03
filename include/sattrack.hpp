@@ -7,7 +7,7 @@
 #define __SATTRACK_HPP
 
 #include <sattrack/config.hpp>
-#include <sattrack/orbit.hpp>
+#include <sattrack/satellite.hpp>
 #include <sattrack/n2yo.hpp>
 #include <sattrack/celestrak.hpp>
 
