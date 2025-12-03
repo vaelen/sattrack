@@ -34,7 +34,9 @@ make test
 
 SatTrack is a command-line application built using C++20. I wrote it largely as an opportunity to better familiarize myself with the features of C++11, C++14, C++17, and C++20 since I originally learned C++ back in the late 90s.
 
-I used Claude Code to help speed up my implementation of SatTrack by helping me maintain my build scripts, write test cases, update documentation, and perform research on calculations and C++20 features that I wasn't familiar with, but the actual code was written by me.
+I used Claude Code to help speed up my implementation of SatTrack by helping me maintain my build scripts, write test cases, update documentation, and perform research on calculations and C++20 features that I wasn't familiar with, but most of the actual code was written by me.
+
+Although I wrote the initial [Keplerian](https://en.wikipedia.org/wiki/Kepler_orbit) propagation code by hand and learned a lot from doing so, when I decided to move to [SGP4/SDP4](https://en.wikipedia.org/wiki/Simplified_perturbations_models) to improve pass prediction accuracy I had Claude port the SGP4/SDP4 [reference implementation](https://celestrak.org/software/vallado-sw.php) published by Celestrak rather than writing it myself. I had Claude port the code rather than using an off-the-shelf library because I wanted tighter integration with my other code and with the C++20 standard library.
 
 ## Data sources
 
@@ -250,3 +252,18 @@ SatTrack depends on these libraries:
 3. [curlpp](https://github.com/jpbarrette/curlpp) wraps [libcurl](https://curl.se/libcurl/) in a C++ interface for making HTTPS requests.
 4. [CLI11](https://github.com/CLIUtils/CLI11) for command-line argument parsing.
 5. [Google Test](https://github.com/google/googletest) for unit testing (only needed for running tests).
+
+SatTrack also depends on Howard Hinnant's [date library](https://howardhinnant.github.io/date/date.html) to support C++20 date/time functions that are not yet well supported by most compilers.
+
+Here is the copyright statement for the date library:
+
+```cpp
+// The MIT License (MIT)
+//
+// Copyright (c) 2015, 2016, 2017 Howard Hinnant
+// Copyright (c) 2016 Adrian Colomitchi
+// Copyright (c) 2017 Florian Dang
+// Copyright (c) 2017 Paul Thompson
+// Copyright (c) 2018, 2019 Tomasz Kamiński
+// Copyright (c) 2019 Jiangang Zhuang
+```
