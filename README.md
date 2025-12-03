@@ -34,7 +34,7 @@ make test
 
 SatTrack is a command-line application built using C++20. I wrote it largely as an opportunity to better familiarize myself with the features of C++11, C++14, C++17, and C++20 since I originally learned C++ back in the late 90s.
 
-I used Claude Code to help speed up my implementation of SatTrack by helping me maintain my build scripts, write test cases, and perform research on C++20 features that I wasn't aware of, but the actual code was written by me.
+I used Claude Code to help speed up my implementation of SatTrack by helping me maintain my build scripts, write test cases, update documentation, and perform research on calculations and C++20 features that I wasn't familiar with, but the actual code was written by me.
 
 ## Data sources
 

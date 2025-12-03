@@ -29,8 +29,8 @@ constexpr double GMST_T2_COEFF = 0.000387933;   // Quadratic correction for prec
 constexpr double GMST_T3_DIVISOR = 38710000.0;  // Cubic correction divisor (T³ term)
 
 // Degree-radian conversion factors
-constexpr double DEGREES_TO_RADIANS = std::numbers::pi / 180.0;
-constexpr double RADIANS_TO_DEGREES = 180.0 / std::numbers::pi;
+constexpr double DEGREES_TO_RADIANS = M_PI / 180.0;
+constexpr double RADIANS_TO_DEGREES = 180.0 / M_PI;
 
 /**
  * 3D vector in Cartesian coordinates.  

@@ -83,13 +83,13 @@ sattrack::PassInfo convertN2YOPassToPassInfo(
     passInfo.riseTime = toTimePoint(n2yoPass.startUTC);
     passInfo.setTime = toTimePoint(n2yoPass.endUTC);
     passInfo.maxElevationTime = toTimePoint(n2yoPass.maxUTC);
-    passInfo.riseAngles.azimuthInRadians = n2yoPass.startAz * RADIANS_TO_DEGREES;
+    passInfo.riseAngles.azimuthInRadians = n2yoPass.startAz * DEGREES_TO_RADIANS;
     passInfo.riseAngles.elevationInRadians = 0.0;  // N2YO does not provide elevation at rise
     passInfo.riseAngles.rangeInKilometers = 0.0;  // N2YO does not provide range at rise
-    passInfo.maxAngles.azimuthInRadians = n2yoPass.maxAz * RADIANS_TO_DEGREES;
-    passInfo.maxAngles.elevationInRadians = n2yoPass.maxEl * RADIANS_TO_DEGREES;
+    passInfo.maxAngles.azimuthInRadians = n2yoPass.maxAz * DEGREES_TO_RADIANS;
+    passInfo.maxAngles.elevationInRadians = n2yoPass.maxEl * DEGREES_TO_RADIANS;
     passInfo.maxAngles.rangeInKilometers = 0.0;  // N2YO does not provide range at max elevation
-    passInfo.setAngles.azimuthInRadians = n2yoPass.endAz * RADIANS_TO_DEGREES;
+    passInfo.setAngles.azimuthInRadians = n2yoPass.endAz * DEGREES_TO_RADIANS;
     passInfo.setAngles.elevationInRadians = 0.0;  // N2YO does not provide elevation at set
     passInfo.setAngles.rangeInKilometers = 0.0;  // N2YO does not provide range at set
 
@@ -492,6 +492,7 @@ int main(int argc, char* argv[]) {
     });
 
     geoCommand->final_callback([geoCommand, &config, &tleFilename, &geoIDs](void) {
+        using namespace sattrack;
         try {
             if (geoIDs.empty()) {
                 std::cerr << "Please provide at least one satellite's Norad ID." << std::endl;
@@ -509,8 +510,8 @@ int main(int argc, char* argv[]) {
                 double julianDate = sattrack::toJulianDate(config.getTime());
                 auto geo = orbit.getGeodeticLocationAtTime(julianDate);
                 std::cout << "Satellite: " << orbit.getName() << std::endl;
-                std::cout << "  Latitude: " << geo.latInRadians * (180.0 / M_PI) << " deg" << std::endl;
-                std::cout << "  Longitude: " << geo.lonInRadians * (180.0 / M_PI) << " deg" << std::endl;
+                std::cout << "  Latitude: " << geo.latInRadians * RADIANS_TO_DEGREES << " deg" << std::endl;
+                std::cout << "  Longitude: " << geo.lonInRadians * RADIANS_TO_DEGREES << " deg" << std::endl;
                 std::cout << "  Altitude: " << geo.altInKilometers << " km" << std::endl;
                 std::cout << std::endl;
             }
@@ -521,6 +522,7 @@ int main(int argc, char* argv[]) {
     });
 
     lookCommand->final_callback([lookCommand, &config, &tleFilename, &lookIDs](void) {
+        using namespace sattrack;
         try {
             if (lookIDs.empty()) {
                 std::cerr << "Please provide at least one satellite's Norad ID." << std::endl;
@@ -532,8 +534,8 @@ int main(int argc, char* argv[]) {
 
             // Create observer from config (convert degrees to radians, meters to km)
             sattrack::Geodetic observer{
-                config.getLatitude() * (M_PI / 180.0),
-                config.getLongitude() * (M_PI / 180.0),
+                config.getLatitude() * DEGREES_TO_RADIANS,
+                config.getLongitude() * DEGREES_TO_RADIANS,
                 config.getAltitude() / 1000.0
             };
 
@@ -547,8 +549,8 @@ int main(int argc, char* argv[]) {
                 auto orbit = satellites[noradID];
                 auto angles = sattrack::getLookAngles(orbit, observer, julianDate);
 
-                double azDeg = angles.azimuthInRadians * (180.0 / M_PI);
-                double elDeg = angles.elevationInRadians * (180.0 / M_PI);
+                double azDeg = angles.azimuthInRadians * RADIANS_TO_DEGREES ;
+                double elDeg = angles.elevationInRadians * RADIANS_TO_DEGREES;
 
                 std::cout << "Satellite: " << orbit.getName() << std::endl;
                 std::cout << "  Azimuth:   " << std::format("{:6.2f}", azDeg) << " deg (" << azimuthToCompass(angles.azimuthInRadians) << ")" << std::endl;
@@ -563,6 +565,7 @@ int main(int argc, char* argv[]) {
     });
 
     visibleCommand->final_callback([visibleCommand, &config, &tleFilename, &visibleIDs](void) {
+        using namespace sattrack;
         try {
             if (visibleIDs.empty()) {
                 std::cerr << "Please provide at least one satellite's Norad ID." << std::endl;
@@ -573,13 +576,13 @@ int main(int argc, char* argv[]) {
             loadTLEDatabase(tleFilename, satellites);
 
             sattrack::Geodetic observer{
-                config.getLatitude() * (M_PI / 180.0),
-                config.getLongitude() * (M_PI / 180.0),
+                config.getLatitude() * DEGREES_TO_RADIANS,
+                config.getLongitude() * DEGREES_TO_RADIANS,
                 config.getAltitude() / 1000.0
             };
 
             double julianDate = sattrack::toJulianDate(config.getTime());
-            double minElevRad = config.getMinimumElevation() * (M_PI / 180.0);
+            double minElevRad = config.getMinimumElevation() * DEGREES_TO_RADIANS;
 
             for (auto noradID : visibleIDs) {
                 if (!satellites.contains(noradID)) {
@@ -590,8 +593,8 @@ int main(int argc, char* argv[]) {
                 auto angles = sattrack::getLookAngles(orbit, observer, julianDate);
                 bool visible = sattrack::isVisible(angles, minElevRad);
 
-                double azDeg = angles.azimuthInRadians * (180.0 / M_PI);
-                double elDeg = angles.elevationInRadians * (180.0 / M_PI);
+                double azDeg = angles.azimuthInRadians * RADIANS_TO_DEGREES;
+                double elDeg = angles.elevationInRadians * RADIANS_TO_DEGREES;
 
                 std::cout << "Satellite: " << orbit.getName() << std::endl;
                 std::cout << "  Visible:   " << (visible ? "YES" : "NO") << " (min elevation: " << config.getMinimumElevation() << " deg)" << std::endl;
@@ -607,6 +610,7 @@ int main(int argc, char* argv[]) {
     });
 
     trackCommand->final_callback([trackCommand, &config, &tleFilename, &trackIDs, &trackInterval, &trackDuration](void) {
+        using namespace sattrack;
         try {
             if (trackIDs.empty()) {
                 std::cerr << "Please provide at least one satellite's Norad ID." << std::endl;
@@ -617,8 +621,8 @@ int main(int argc, char* argv[]) {
             loadTLEDatabase(tleFilename, satellites);
 
             sattrack::Geodetic observer{
-                config.getLatitude() * (M_PI / 180.0),
-                config.getLongitude() * (M_PI / 180.0),
+                config.getLatitude() * DEGREES_TO_RADIANS,
+                config.getLongitude() * DEGREES_TO_RADIANS,
                 config.getAltitude() / 1000.0
             };
 
@@ -647,8 +651,8 @@ int main(int argc, char* argv[]) {
                     auto& orbit = satellites[noradID];
                     auto angles = sattrack::getLookAngles(orbit, observer, julianDate);
 
-                    double azDeg = angles.azimuthInRadians * (180.0 / M_PI);
-                    double elDeg = angles.elevationInRadians * (180.0 / M_PI);
+                    double azDeg = angles.azimuthInRadians * RADIANS_TO_DEGREES;
+                    double elDeg = angles.elevationInRadians * RADIANS_TO_DEGREES;
 
                     std::cout << std::format(rowFormat,
                         orbit.getName().substr(0, 20),
@@ -682,12 +686,12 @@ int main(int argc, char* argv[]) {
             loadTLEDatabase(tleFilename, satellites);
 
             sattrack::Geodetic observer{
-                config.getLatitude() * (M_PI / 180.0),
-                config.getLongitude() * (M_PI / 180.0),
+                config.getLatitude() * DEGREES_TO_RADIANS,
+                config.getLongitude() * DEGREES_TO_RADIANS,
                 config.getAltitude() / 1000.0
             };
 
-            double minElevRad = config.getMinimumElevation() * (M_PI / 180.0);
+            double minElevRad = config.getMinimumElevation() * DEGREES_TO_RADIANS;
             auto searchDuration = std::chrono::hours(24 * config.getDays());
 
             std::vector<PassInfo> passes;
