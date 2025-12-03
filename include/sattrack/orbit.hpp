@@ -1,6 +1,9 @@
 /*
  * Copyright (c) 2025 Andrew C. Young <andrew@vaelen.org>
  * SPDX-License-Identifier: MIT
+ *
+ * SGP4 algorithm based on the Vallado reference implementation.
+ * See: https://celestrak.org/software/vallado-sw.php
  */
 
 #ifndef __SATTRACK_ORBIT_HPP
@@ -13,10 +16,28 @@
 #include <string_view>
 #include <iostream>
 #include <map>
+#include <stdexcept>
 
 namespace sattrack {
 
 using time_point = std::chrono::system_clock::time_point;
+
+// ============================================================================
+// SGP4 Constants
+// ============================================================================
+
+// WGS84 / EGM-96 Constants
+constexpr double SGP4_MU = 398600.8;            // Earth gravitational parameter (km³/s²)
+constexpr double SGP4_RADIUS_EARTH_KM = 6378.135;  // Earth equatorial radius (km)
+constexpr double SGP4_J2 = 0.001082616;         // Second gravitational zonal harmonic
+constexpr double SGP4_J3 = -0.00000253881;      // Third gravitational zonal harmonic
+constexpr double SGP4_J4 = -0.00000165597;      // Fourth gravitational zonal harmonic
+constexpr double SGP4_J3OJ2 = SGP4_J3 / SGP4_J2;
+constexpr double SGP4_XKE = 0.0743669161331734132;  // sqrt(GM) in Earth radii^1.5/min
+constexpr double SGP4_TUMIN = 13.44683969695931;    // Minutes per time unit
+constexpr double SGP4_VKMPERSEC = 7.905366149846074; // km/s per velocity unit
+constexpr double SGP4_TWO_PI = 2.0 * M_PI;
+constexpr double SGP4_X2O3 = 2.0 / 3.0;
 
 // Astronomical constants
 constexpr double J2000_JD = 2451545.0;                      // Julian Date of J2000.0 epoch
@@ -32,8 +53,40 @@ constexpr double GMST_T3_DIVISOR = 38710000.0;  // Cubic correction divisor (T³
 constexpr double DEGREES_TO_RADIANS = M_PI / 180.0;
 constexpr double RADIANS_TO_DEGREES = 180.0 / M_PI;
 
+// ============================================================================
+// SGP4 Exception Classes
+// ============================================================================
+
 /**
- * 3D vector in Cartesian coordinates.  
+ * Base exception class for SGP4 propagation errors.
+ */
+class SGP4Exception : public std::runtime_error {
+public:
+    explicit SGP4Exception(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+/**
+ * Exception thrown when a satellite has decayed (re-entered atmosphere).
+ */
+class SatelliteDecayedException : public SGP4Exception {
+public:
+    SatelliteDecayedException() : SGP4Exception("Satellite has decayed") {}
+};
+
+/**
+ * Exception thrown when orbital elements are invalid.
+ */
+class InvalidOrbitException : public SGP4Exception {
+public:
+    explicit InvalidOrbitException(const std::string& msg) : SGP4Exception(msg) {}
+};
+
+// ============================================================================
+// Basic Data Types
+// ============================================================================
+
+/**
+ * 3D vector in Cartesian coordinates.
  */
 struct Vec3 {
     double x, y, z;
@@ -68,12 +121,6 @@ struct Vec3 {
 
     /**
      * Returns a unit vector (magnitude = 1) in the same direction as this vector.
-     *
-     * The normalized vector is computed as: v / |v|
-     *
-     * WARNING: If the vector has zero magnitude, this will result in division
-     * by zero, producing NaN or Inf values. Check magnitude() > 0 before calling
-     * if the vector might be zero.
      */
     Vec3 normalize() const {
         double mag = magnitude();
@@ -83,64 +130,26 @@ struct Vec3 {
 
 /**
  * Geodetic coordinates representing a position on or above Earth's surface.
- *
- * Uses the WGS84 (World Geodetic System 1984) reference ellipsoid, which is
- * the standard for GPS and most modern mapping applications.
  */
 struct Geodetic {
     double latInRadians;      ///< Geodetic latitude (-π/2 to +π/2, positive = North)
     double lonInRadians;      ///< Longitude (-π to +π, positive = East)
     double altInKilometers;   ///< Altitude above the WGS84 ellipsoid surface
 
-    /**
-     * Converts geodetic coordinates to Earth-Centered Earth-Fixed (ECEF) coordinates.
-     *
-     * ECEF is a Cartesian coordinate system with:
-     * - Origin at Earth's center of mass
-     * - X-axis pointing toward the intersection of the equator and prime meridian (0°N, 0°E)
-     * - Y-axis pointing toward 0°N, 90°E
-     * - Z-axis pointing toward the North Pole
-     *
-     * The conversion uses the WGS84 ellipsoid parameters:
-     * - Semi-major axis (equatorial radius): a = 6378.137 km
-     * - Flattening: f = 1/298.257223563
-     * - Eccentricity squared: e² = f(2-f) ≈ 0.00669437999014
-     *
-     * Algorithm:
-     * 1. Compute the radius of curvature in the prime vertical (N):
-     *    N = a / √(1 - e² × sin²(lat))
-     *    This accounts for Earth's ellipsoidal shape - N is larger at the equator
-     *    than at the poles.
-     *
-     * 2. Compute ECEF coordinates:
-     *    X = (N + alt) × cos(lat) × cos(lon)
-     *    Y = (N + alt) × cos(lat) × sin(lon)
-     *    Z = (N × (1 - e²) + alt) × sin(lat)
-     *
-     * The (1 - e²) factor in Z accounts for the ellipsoid's polar flattening.
-     *
-     * @return Vec3 containing ECEF coordinates in kilometers
-     */
     Vec3 toECEF() const;
 };
 
 /**
  * Look angles from an observer to a target (typically a satellite).
- *
- * These angles describe where to point an antenna or telescope to track
- * a satellite from a ground station.
  */
 struct LookAngles {
-    double azimuthInRadians;      ///< Compass direction (0 = North, π/2 = East, π = South, 3π/2 = West)
-    double elevationInRadians;    ///< Angle above horizon (0 = horizon, π/2 = directly overhead)
+    double azimuthInRadians;      ///< Compass direction (0 = North, π/2 = East, etc.)
+    double elevationInRadians;    ///< Angle above horizon (0 = horizon, π/2 = overhead)
     double rangeInKilometers;     ///< Slant range (straight-line distance) to the target
 };
 
 /**
  * Information about a single satellite pass over a ground station.
- *
- * A "pass" is the period during which a satellite is visible above the
- * observer's horizon (or above a specified minimum elevation threshold).
  */
 struct PassInfo {
     int noradID;                  ///< NORAD Catalog ID of the satellite
@@ -153,14 +162,40 @@ struct PassInfo {
     LookAngles setAngles;         ///< Azimuth/elevation at set
 };
 
+// ============================================================================
+// Orbit Class with SGP4 Propagation
+// ============================================================================
+
+/**
+ * Represents a satellite orbit and provides SGP4/SDP4 propagation.
+ *
+ * The SGP4 algorithm is used for near-Earth satellites (orbital period < 225 min)
+ * and SDP4 is used for deep-space satellites (orbital period >= 225 min).
+ *
+ * Usage:
+ *   Orbit orbit;
+ *   orbit.updateFromTLE(tleString);
+ *   Vec3 position = orbit.getECI(julianDate);
+ *
+ * Note: This class is not thread-safe for the same instance. The mutable SGP4
+ * state is initialized lazily on first propagation.
+ */
 class Orbit {
 public:
     Orbit() = default;
     ~Orbit() = default;
 
+    /**
+     * Update orbital elements from a TLE string with a separate name.
+     */
     void updateFromTLE(const std::string_view &name, const std::string_view &tle);
+
+    /**
+     * Update orbital elements from a TLE string (name from TLE line 0).
+     */
     void updateFromTLE(const std::string_view &tle);
 
+    // Accessors for TLE data
     std::string getName() const;
     int getNoradID() const;
     char getClassification() const;
@@ -171,6 +206,7 @@ public:
     double getBstarDragTerm() const;
     int getElementSetNumber() const;
 
+    // Accessors for orbital elements
     double getInclination() const;
     double getRightAscensionOfAscendingNode() const;
     double getEccentricity() const;
@@ -178,40 +214,203 @@ public:
     double getMeanAnomaly() const;
     double getMeanMotion() const;
     int getRevolutionNumberAtEpoch() const;
-    
-    double getMeanAnomalyAtTime(const double julianDate) const;
-    double getEccentricAnomalyFromMeanAnomaly(double meanAnomalyInRadians, double tolerance = 1e-12) const;
-    double getTrueAnomalyFromEccentricAnomaly(double eccentricAnomalyInRadians) const;
-    double getTrueAnomalyAtTime(const double julianDate) const;
-    Vec3 getECI(double trueAnomalyInRadians) const;
+
+    /**
+     * Get position in Earth-Centered Inertial (ECI/TEME) coordinates.
+     *
+     * Uses SGP4/SDP4 propagation to compute the satellite position at the
+     * specified Julian Date. The returned coordinates are in the True Equator
+     * Mean Equinox (TEME) reference frame, in kilometers.
+     *
+     * @param julianDate The time for which to compute position
+     * @return Position vector in TEME coordinates (km)
+     * @throws SatelliteDecayedException if the satellite has decayed
+     * @throws InvalidOrbitException if orbital elements are invalid
+     */
+    Vec3 getECI(double julianDate) const;
+
+    /**
+     * Get velocity in Earth-Centered Inertial (ECI/TEME) coordinates.
+     *
+     * @param julianDate The time for which to compute velocity
+     * @return Velocity vector in TEME coordinates (km/s)
+     */
+    Vec3 getVelocity(double julianDate) const;
+
+    /**
+     * Get geodetic location (latitude, longitude, altitude) at a given time.
+     */
     Geodetic getGeodeticLocationAtTime(const time_point tp) const;
     Geodetic getGeodeticLocationAtTime(const double julianDate) const;
 
+    /**
+     * Print orbital element information to a stream.
+     */
     void printInfo(std::ostream &os) const;
+
+    /**
+     * Get TLE string representation.
+     */
     std::string getTLE() const;
+
 private:
-// Satellite Identification
+    // ========================================================================
+    // TLE Data
+    // ========================================================================
+
+    // Satellite Identification
     std::string name;
 
-// First Line - Satellite Identification
-    int noradID;
-    char classification;
+    // First Line - Satellite Identification
+    int noradID = 0;
+    char classification = 'U';
     std::string designator;
     time_point epoch;
-    double firstDerivativeMeanMotion;
-    double secondDerivativeMeanMotion;
-    double bstarDragTerm;
-    int elementSetNumber;
+    double firstDerivativeMeanMotion = 0.0;
+    double secondDerivativeMeanMotion = 0.0;
+    double bstarDragTerm = 0.0;
+    int elementSetNumber = 0;
 
-// Second Line - Orbital Elements
-    double inclination;
-    double rightAscensionOfAscendingNode;
-    double eccentricity;
-    double argumentOfPerigee;
-    double meanAnomaly;
-    double meanMotion;
-    int revolutionNumberAtEpoch;
+    // Second Line - Orbital Elements (in degrees, except eccentricity)
+    double inclination = 0.0;
+    double rightAscensionOfAscendingNode = 0.0;
+    double eccentricity = 0.0;
+    double argumentOfPerigee = 0.0;
+    double meanAnomaly = 0.0;
+    double meanMotion = 0.0;  // revolutions per day
+    int revolutionNumberAtEpoch = 0;
+
+    // ========================================================================
+    // SGP4 State Variables (computed during initialization)
+    // ========================================================================
+
+    mutable bool sgp4Initialized_ = false;
+
+    // Epoch in Julian Date (split for precision)
+    mutable double jdsatepoch_ = 0.0;      // Integer part
+    mutable double jdsatepochF_ = 0.0;     // Fractional part
+
+    // Method flag: 'n' = near-earth (SGP4), 'd' = deep-space (SDP4)
+    mutable char method_ = 'n';
+
+    // Initialization flags
+    mutable bool isimp_ = false;           // Simple drag flag
+    mutable int irez_ = 0;                 // Resonance flag (0=none, 1=1-day, 2=0.5-day)
+
+    // Common orbital parameters
+    mutable double a_ = 0.0;               // Semi-major axis (Earth radii)
+    mutable double alta_ = 0.0;            // Altitude at apogee
+    mutable double altp_ = 0.0;            // Altitude at perigee
+    mutable double argpo_ = 0.0;           // Argument of perigee (rad)
+    mutable double bstar_ = 0.0;           // Drag term
+    mutable double ecco_ = 0.0;            // Eccentricity
+    mutable double inclo_ = 0.0;           // Inclination (rad)
+    mutable double mo_ = 0.0;              // Mean anomaly (rad)
+    mutable double no_kozai_ = 0.0;        // Mean motion (Kozai, rad/min)
+    mutable double no_unkozai_ = 0.0;      // Mean motion (un-Kozai'd, rad/min)
+    mutable double nodeo_ = 0.0;           // Right ascension (rad)
+    mutable double gsto_ = 0.0;            // Greenwich sidereal time at epoch
+    mutable double cosio2_ = 0.0;          // cosine of inclination squared
+    mutable double eccsq_ = 0.0;           // Eccentricity squared
+
+    // Near-earth coefficients
+    mutable double aycof_ = 0.0;
+    mutable double con41_ = 0.0;
+    mutable double cc1_ = 0.0, cc4_ = 0.0, cc5_ = 0.0;
+    mutable double d2_ = 0.0, d3_ = 0.0, d4_ = 0.0;
+    mutable double delmo_ = 0.0;
+    mutable double eta_ = 0.0;
+    mutable double argpdot_ = 0.0;
+    mutable double omgcof_ = 0.0;
+    mutable double sinmao_ = 0.0;
+    mutable double t2cof_ = 0.0, t3cof_ = 0.0, t4cof_ = 0.0, t5cof_ = 0.0;
+    mutable double x1mth2_ = 0.0;
+    mutable double x7thm1_ = 0.0;
+    mutable double mdot_ = 0.0;
+    mutable double nodedot_ = 0.0;
+    mutable double xlcof_ = 0.0;
+    mutable double xmcof_ = 0.0;
+    mutable double nodecf_ = 0.0;
+
+    // Deep space coefficients
+    mutable double e3_ = 0.0, ee2_ = 0.0;
+    mutable double peo_ = 0.0, pgho_ = 0.0, pho_ = 0.0, pinco_ = 0.0, plo_ = 0.0;
+    mutable double se2_ = 0.0, se3_ = 0.0, sgh2_ = 0.0, sgh3_ = 0.0, sgh4_ = 0.0;
+    mutable double sh2_ = 0.0, sh3_ = 0.0, si2_ = 0.0, si3_ = 0.0, sl2_ = 0.0;
+    mutable double sl3_ = 0.0, sl4_ = 0.0;
+    mutable double xgh2_ = 0.0, xgh3_ = 0.0, xgh4_ = 0.0;
+    mutable double xh2_ = 0.0, xh3_ = 0.0;
+    mutable double xi2_ = 0.0, xi3_ = 0.0;
+    mutable double xl2_ = 0.0, xl3_ = 0.0, xl4_ = 0.0;
+    mutable double xlamo_ = 0.0;
+    mutable double zmol_ = 0.0, zmos_ = 0.0;
+    mutable double atime_ = 0.0;
+    mutable double xli_ = 0.0, xni_ = 0.0;
+
+    // Resonance coefficients
+    mutable double d2201_ = 0.0, d2211_ = 0.0;
+    mutable double d3210_ = 0.0, d3222_ = 0.0;
+    mutable double d4410_ = 0.0, d4422_ = 0.0;
+    mutable double d5220_ = 0.0, d5232_ = 0.0, d5421_ = 0.0, d5433_ = 0.0;
+    mutable double del1_ = 0.0, del2_ = 0.0, del3_ = 0.0;
+    mutable double dedt_ = 0.0, didt_ = 0.0, dmdt_ = 0.0;
+    mutable double dnodt_ = 0.0, domdt_ = 0.0;
+
+    // ========================================================================
+    // SGP4 Private Methods
+    // ========================================================================
+
+    /**
+     * Initialize SGP4 state from orbital elements.
+     * Called lazily on first propagation.
+     */
+    void initializeSGP4() const;
+
+    /**
+     * Core SGP4/SDP4 propagation.
+     * @param tsince Minutes since epoch
+     * @param r Output position vector (km)
+     * @param v Output velocity vector (km/s)
+     */
+    void propagateSGP4(double tsince, double r[3], double v[3]) const;
+
+    /**
+     * Initialize deep space (SDP4) coefficients.
+     */
+    void initializeDeepSpace(
+        double tc, double& snodm, double& cnodm, double& sinim, double& cosim,
+        double& sinomm, double& cosomm, double& day, double& em, double& emsq,
+        double& gam, double& rtemsq, double& s1, double& s2, double& s3,
+        double& s4, double& s5, double& s6, double& s7, double& ss1,
+        double& ss2, double& ss3, double& ss4, double& ss5, double& ss6,
+        double& ss7, double& sz1, double& sz2, double& sz3, double& sz11,
+        double& sz12, double& sz13, double& sz21, double& sz22, double& sz23,
+        double& sz31, double& sz32, double& sz33, double& nm, double& z1,
+        double& z2, double& z3, double& z11, double& z12, double& z13,
+        double& z21, double& z22, double& z23, double& z31, double& z32,
+        double& z33
+    ) const;
+
+    /**
+     * Apply deep space secular effects.
+     */
+    void deepSpaceSecular(
+        double t, double& em, double& argpm, double& inclm,
+        double& nodem, double& mm, double& nm
+    ) const;
+
+    /**
+     * Apply deep space periodic effects.
+     */
+    void deepSpacePeriodic(
+        double t, double& em, double& inclm, double& nodem,
+        double& argpm, double& mm
+    ) const;
 };
+
+// ============================================================================
+// TLE Database Functions
+// ============================================================================
 
 void loadTLEDatabase(std::istream &s, std::map<int, Orbit> &database, std::ostream &logStream = std::cerr);
 void loadTLEDatabase(const std::string &filepath, std::map<int, Orbit> &database, std::ostream &logStream = std::cerr);
@@ -229,114 +428,22 @@ std::string formatFirstDerivative(double value);
 
 /**
  * Converts a time_point to Julian Date.
- *
- * Julian Date (JD) is a continuous count of days since the beginning of the
- * Julian Period (January 1, 4713 BC in the proleptic Julian calendar). It is
- * the standard time representation used in astronomy and orbital mechanics
- * because it provides a uniform time scale without the complications of
- * calendars, leap years, or time zones.
- *
- * Key reference points:
- * - J2000.0 epoch (2000-01-01 12:00:00 TT): JD 2451545.0
- * - Unix epoch (1970-01-01 00:00:00 UTC): JD 2440587.5
- *
- * The conversion adds the Unix epoch's Julian Date to the number of days
- * elapsed since the Unix epoch.
- *
- * @param tp The time_point to convert (assumed to be UTC)
- * @return The corresponding Julian Date as a double
  */
 double toJulianDate(time_point tp);
 
 /**
  * Computes Greenwich Mean Sidereal Time (GMST) for a given Julian Date.
- *
- * Sidereal time measures Earth's rotation relative to the stars (rather than
- * the Sun). GMST specifically measures the angle between the prime meridian
- * and the vernal equinox (First Point of Aries).
- *
- * GMST is essential for converting between Earth-Centered Inertial (ECI) and
- * Earth-Centered Earth-Fixed (ECEF) coordinate systems, as it describes how
- * much Earth has rotated at any given instant.
- *
- * Algorithm (IAU 1982 model):
- * 1. Compute Julian centuries T since J2000.0:
- *    T = (JD - 2451545.0) / 36525.0
- *
- * 2. Compute GMST in degrees using the polynomial:
- *    GMST = 280.46061837 + 360.98564736629 × (JD - 2451545.0)
- *           + 0.000387933 × T² - T³/38710000
- *
- * The coefficients account for:
- * - 280.46061837°: GMST at J2000.0 epoch
- * - 360.98564736629°/day: Earth's sidereal rotation rate
- * - Higher-order terms: precession and long-term variations
- *
- * @param julianDate The Julian Date for which to compute GMST
  * @return GMST in radians, normalized to [0, 2π)
  */
 double gmst(double julianDate);
 
 /**
  * Converts Earth-Centered Inertial (ECI) to Earth-Centered Earth-Fixed (ECEF).
- *
- * ECI and ECEF are both Cartesian coordinate systems centered at Earth's
- * center of mass, but they differ in how they handle Earth's rotation:
- *
- * - ECI (Inertial): Axes are fixed relative to the stars. The X-axis points
- *   toward the vernal equinox, Z-axis toward the celestial north pole.
- *   Used for orbital mechanics because Newton's laws apply directly.
- *
- * - ECEF (Earth-Fixed): Axes rotate with Earth. X-axis points toward 0°N, 0°E
- *   (intersection of equator and prime meridian), Z-axis toward the North Pole.
- *   Used for ground-based positions and GPS.
- *
- * The transformation is a rotation about the Z-axis by the Greenwich Sidereal
- * Time (GST), which represents how much Earth has rotated:
- *
- *     | x_ecef |   |  cos(GST)  sin(GST)  0 |   | x_eci |
- *     | y_ecef | = | -sin(GST)  cos(GST)  0 | × | y_eci |
- *     | z_ecef |   |     0         0      1 |   | z_eci |
- *
- * Note: Z component is unchanged because Earth rotates about its polar axis.
- *
- * @param eci Position vector in ECI coordinates (km)
- * @param gst Greenwich Sidereal Time in radians
- * @return Position vector in ECEF coordinates (km)
  */
 Vec3 eciToECEF(const Vec3 &eci, double gst);
 
 /**
- * Converts Earth-Centered Earth-Fixed (ECEF) coordinates to geodetic.
- *
- * Geodetic coordinates (latitude, longitude, altitude) describe a position
- * relative to a reference ellipsoid (WGS84). This is the inverse of
- * Geodetic::toECEF().
- *
- * The conversion is non-trivial because:
- * - Earth is an ellipsoid, not a sphere
- * - Geodetic latitude is the angle between the ellipsoid normal and the
- *   equatorial plane, NOT the angle from Earth's center
- *
- * Algorithm (Bowring's iterative method):
- * 1. Compute longitude directly: λ = atan2(y, x)
- *
- * 2. Compute horizontal distance from Z-axis: p = √(x² + y²)
- *
- * 3. Initial latitude guess: φ₀ = atan2(z, p × (1 - e²))
- *
- * 4. Iterate to refine latitude (typically converges in 2-3 iterations):
- *    - N = a / √(1 - e² × sin²(φ))  (radius of curvature)
- *    - φ = atan2(z + e² × N × sin(φ), p)
- *
- * 5. Compute altitude: h = p / cos(φ) - N
- *
- * Uses WGS84 ellipsoid parameters:
- * - Semi-major axis: a = 6378.137 km
- * - Flattening: f = 1/298.257223563
- *
- * @param ecef Position in ECEF coordinates (km)
- * @return Geodetic coordinates (latitude and longitude in radians, altitude in km)
+ * Converts ECEF coordinates to geodetic.
  */
 Geodetic ecefToGeodetic(const Vec3 &ecef);
 
@@ -346,123 +453,32 @@ Geodetic ecefToGeodetic(const Vec3 &ecef);
 
 /**
  * Transforms a position from ECEF to ENU (East-North-Up) coordinates.
- *
- * ENU is a local tangent plane coordinate system centered at the observer:
- * - East (E): Points toward geographic East (tangent to latitude circle)
- * - North (N): Points toward geographic North (tangent to meridian)
- * - Up (U): Points radially outward from Earth's center (normal to ellipsoid)
- *
- * This transformation is essential for computing look angles because it
- * converts the satellite's position into a reference frame aligned with
- * the observer's local horizon.
- *
- * Algorithm:
- * 1. Compute the difference vector: Δ = target_ECEF - observer_ECEF
- *    This gives the vector from observer to target in ECEF coordinates.
- *
- * 2. Apply the rotation matrix to transform from ECEF to ENU:
- *    The rotation depends on the observer's latitude (φ) and longitude (λ):
- *
- *    | E |   | -sin(λ)        cos(λ)         0      |   | Δx |
- *    | N | = | -sin(φ)cos(λ) -sin(φ)sin(λ)  cos(φ) | × | Δy |
- *    | U |   |  cos(φ)cos(λ)  cos(φ)sin(λ)  sin(φ) |   | Δz |
- *
- * This rotation matrix is derived by:
- * - First rotating about Z-axis by -λ to align X with the local meridian
- * - Then rotating about the new Y-axis by (π/2 - φ) to align Z with local up
- *
- * @param targetECEF The target position in ECEF coordinates (km)
- * @param observer The observer's geodetic location
- * @return Vec3 with (East, North, Up) components in kilometers
  */
 Vec3 ecefToENU(const Vec3& targetECEF, const Geodetic& observer);
 
 /**
  * Computes look angles from an observer to a target given in ECEF coordinates.
- *
- * @param satECEF The satellite position in ECEF coordinates (km)
- * @param observer The observer's geodetic location
- * @return LookAngles containing azimuth, elevation, and range
  */
 LookAngles getLookAngles(const Vec3& satECEF, const Geodetic& observer);
 
 /**
  * Computes look angles from an observer to a satellite at a specific time.
- *
- * This is a convenience function that combines orbital propagation with
- * look angle calculation. It:
- * 1. Computes the satellite's position at the given Julian date
- * 2. Transforms to ECEF coordinates
- * 3. Computes the look angles from the observer
- *
- * @param orbit The satellite's orbital elements
- * @param observer The observer's geodetic location
- * @param julianDate The time for which to compute look angles
- * @return LookAngles containing azimuth, elevation, and range
  */
 LookAngles getLookAngles(const Orbit& orbit, const Geodetic& observer, double julianDate);
 
 /**
  * Checks if a satellite is visible based on its look angles.
- *
- * A satellite is considered "visible" if its elevation angle is at or above
- * the specified minimum elevation threshold.
- *
- * @param angles The pre-computed look angles to the satellite
- * @param minElevationInRadians The minimum elevation threshold (typically 0 to 10°)
- * @return true if the satellite's elevation meets or exceeds the threshold
  */
 bool isVisible(const LookAngles& angles, double minElevationInRadians);
 
 /**
  * Checks if a satellite is visible from an observer at a specific time.
- *
- * Combines orbital propagation, coordinate transformation, and visibility
- * checking into a single convenience function.
- *
- * @param orbit The satellite's orbital elements
- * @param observer The observer's geodetic location
- * @param julianDate The time to check visibility
- * @param minElevationInRadians The minimum elevation threshold
- * @return true if the satellite is visible at the specified time
  */
 bool isVisible(const Orbit& orbit, const Geodetic& observer,
                double julianDate, double minElevationInRadians);
 
 /**
  * Finds the next satellite pass over an observer's location.
- *
- * A "pass" begins when the satellite rises above the minimum elevation
- * threshold and ends when it sets below that threshold. This function
- * searches forward in time from the start time to find the next complete pass.
- *
- * Algorithm:
- *
- * 1. Coarse search: Steps through time in 60-second increments for up to 48
- *    hours, detecting when elevation transitions above the threshold (rise).
- *    If starting during an existing pass, first searches for the end of that
- *    pass before looking for the next one.
- *
- * 2. Binary search refinement: Once approximate rise and set times are found,
- *    uses binary search to find the precise crossing times within 1 second
- *    accuracy. The search refines the time interval until the gap is < 1 second.
- *
- * 3. Golden section search: Finds the time of maximum elevation between
- *    rise and set times using the golden section algorithm, which efficiently
- *    locates the maximum of a unimodal function without derivatives.
- *
- * Special cases handled:
- * - Starting during an existing pass: Finds the end of current pass, then
- *   continues searching for the next complete pass.
- * - GEO satellites: May not find a pass if the satellite doesn't rise/set.
- * - No pass within window: Returns std::nullopt after searching 48 hours.
- *
- * @param orbit The satellite's orbital elements
- * @param observer The observer's geodetic location
- * @param minElevationInRadians The minimum elevation threshold (typically 0 to 10°)
- * @param startTime The time to begin searching from
- * @return PassInfo for the next pass, or std::nullopt if no pass is found
- *         within a 48-hour search window
  */
 std::optional<PassInfo> findNextPass(
     const Orbit& orbit,

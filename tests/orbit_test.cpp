@@ -474,77 +474,34 @@ TEST(ECEFToGeodeticTest, ISSAltitude) {
 }
 
 // ============================================================================
-// Orbit Anomaly Calculation Tests
+// SGP4 Propagation Tests
 // ============================================================================
 
-TEST_F(OrbitTest, MeanAnomalyAtEpoch) {
+TEST_F(OrbitTest, SGP4InitializesSuccessfully) {
     orbit.updateFromTLE(ISS_TLE);
     double epochJD = toJulianDate(orbit.getEpoch());
-    double M = orbit.getMeanAnomalyAtTime(epochJD);
-    // Should match the TLE mean anomaly (175.9840 degrees) in radians
-    double expectedM = 175.9840 * M_PI / 180.0;
-    EXPECT_NEAR(M, expectedM, 1e-6);
+    // Should not throw - SGP4 initializes on first getECI call
+    EXPECT_NO_THROW(orbit.getECI(epochJD));
 }
 
-TEST_F(OrbitTest, MeanAnomalyInRange) {
+TEST_F(OrbitTest, SGP4PropagationReturnsValidPosition) {
     orbit.updateFromTLE(ISS_TLE);
     double epochJD = toJulianDate(orbit.getEpoch());
-    // Test at various times
-    for (double dt = 0; dt < 1.0; dt += 0.1) {
-        double M = orbit.getMeanAnomalyAtTime(epochJD + dt);
-        EXPECT_GE(M, 0.0);
-        EXPECT_LT(M, 2.0 * M_PI);
-    }
+    Vec3 eci = orbit.getECI(epochJD);
+    double r = eci.magnitude();
+    // ISS should be at reasonable altitude (~420 km above Earth)
+    EXPECT_GT(r, 6700.0);  // Earth radius + ~320 km
+    EXPECT_LT(r, 6900.0);  // Earth radius + ~520 km
 }
 
-TEST_F(OrbitTest, EccentricAnomalyCircularOrbit) {
-    orbit.updateFromTLE(ISS_TLE);
-    // For nearly circular orbits (e ≈ 0), E ≈ M
-    double M = M_PI / 4.0;  // 45 degrees
-    double E = orbit.getEccentricAnomalyFromMeanAnomaly(M);
-    // ISS has e ≈ 0.0003723, so E should be very close to M
-    EXPECT_NEAR(E, M, 0.001);
-}
-
-TEST_F(OrbitTest, EccentricAnomalyKeplerEquation) {
-    orbit.updateFromTLE(ISS_TLE);
-    // Verify Kepler's equation: M = E - e*sin(E)
-    double M = 1.0;  // radians
-    double E = orbit.getEccentricAnomalyFromMeanAnomaly(M);
-    double e = orbit.getEccentricity();
-    double computedM = E - e * std::sin(E);
-    EXPECT_NEAR(computedM, M, 1e-10);
-}
-
-TEST_F(OrbitTest, TrueAnomalyCircularOrbit) {
-    orbit.updateFromTLE(ISS_TLE);
-    // For nearly circular orbits, true anomaly ≈ eccentric anomaly ≈ mean anomaly
-    double E = M_PI / 3.0;  // 60 degrees
-    double nu = orbit.getTrueAnomalyFromEccentricAnomaly(E);
-    EXPECT_NEAR(nu, E, 0.001);
-}
-
-TEST_F(OrbitTest, TrueAnomalyAtZero) {
-    orbit.updateFromTLE(ISS_TLE);
-    // At E = 0, true anomaly should also be 0
-    double nu = orbit.getTrueAnomalyFromEccentricAnomaly(0.0);
-    EXPECT_NEAR(nu, 0.0, 1e-10);
-}
-
-TEST_F(OrbitTest, TrueAnomalyAtPi) {
-    orbit.updateFromTLE(ISS_TLE);
-    // At E = π, true anomaly should also be π
-    double nu = orbit.getTrueAnomalyFromEccentricAnomaly(M_PI);
-    EXPECT_NEAR(nu, M_PI, 1e-10);
-}
-
-TEST_F(OrbitTest, TrueAnomalyAtTimeReturnsValidRange) {
+TEST_F(OrbitTest, SGP4VelocityReturnsValidSpeed) {
     orbit.updateFromTLE(ISS_TLE);
     double epochJD = toJulianDate(orbit.getEpoch());
-    double nu = orbit.getTrueAnomalyAtTime(epochJD);
-    // True anomaly should be in range [-π, π] or [0, 2π)
-    EXPECT_GE(nu, -M_PI);
-    EXPECT_LE(nu, M_PI);
+    Vec3 vel = orbit.getVelocity(epochJD);
+    double speed = vel.magnitude();
+    // ISS orbital velocity is ~7.66 km/s
+    EXPECT_GT(speed, 7.0);
+    EXPECT_LT(speed, 8.0);
 }
 
 // ============================================================================
@@ -553,8 +510,8 @@ TEST_F(OrbitTest, TrueAnomalyAtTimeReturnsValidRange) {
 
 TEST_F(OrbitTest, ECIReturnsReasonableAltitude) {
     orbit.updateFromTLE(ISS_TLE);
-    double nu = 0.0;  // At perigee
-    Vec3 eci = orbit.getECI(nu);
+    double epochJD = toJulianDate(orbit.getEpoch());
+    Vec3 eci = orbit.getECI(epochJD);
     double r = eci.magnitude();
     // ISS altitude is ~420 km, Earth radius ~6378 km
     // So distance from Earth center should be ~6798 km
@@ -564,25 +521,28 @@ TEST_F(OrbitTest, ECIReturnsReasonableAltitude) {
 
 TEST_F(OrbitTest, ECIOrbitIsNearlyCircular) {
     orbit.updateFromTLE(ISS_TLE);
-    // Check radius at perigee (nu=0) and apogee (nu=π)
-    Vec3 eciPerigee = orbit.getECI(0.0);
-    Vec3 eciApogee = orbit.getECI(M_PI);
-    double rPerigee = eciPerigee.magnitude();
-    double rApogee = eciApogee.magnitude();
+    double epochJD = toJulianDate(orbit.getEpoch());
+    // Check radius at two points half an orbit apart (~46 minutes)
+    Vec3 eci1 = orbit.getECI(epochJD);
+    Vec3 eci2 = orbit.getECI(epochJD + 46.0/1440.0);  // 46 minutes later
+    double r1 = eci1.magnitude();
+    double r2 = eci2.magnitude();
     // For ISS with e ≈ 0.0003723, the difference should be small
-    double diff = std::abs(rApogee - rPerigee);
+    double diff = std::abs(r2 - r1);
     EXPECT_LT(diff, 10.0);  // Less than 10 km difference
 }
 
 TEST_F(OrbitTest, ECIInclinationConsistent) {
     orbit.updateFromTLE(ISS_TLE);
-    Vec3 eci = orbit.getECI(M_PI / 2.0);  // At ascending node + 90°
+    double epochJD = toJulianDate(orbit.getEpoch());
+    // At some point during orbit, the z-component will reflect inclination
+    Vec3 eci = orbit.getECI(epochJD + 23.0/1440.0);  // ~quarter orbit
     double r = eci.magnitude();
-    // The z component at this point indicates the inclination
-    // For ISS with i ≈ 51.6°, z/r should be approximately sin(51.6°)
-    double sinI = eci.z / r;
-    double expectedSinI = std::sin(51.6312 * M_PI / 180.0);
-    EXPECT_NEAR(std::abs(sinI), expectedSinI, 0.01);
+    // The maximum |z/r| should be approximately sin(inclination)
+    double zOverR = std::abs(eci.z / r);
+    double maxSinI = std::sin(51.6312 * M_PI / 180.0);
+    // z/r should be <= max inclination
+    EXPECT_LE(zOverR, maxSinI + 0.05);  // Allow small tolerance
 }
 
 // ============================================================================
