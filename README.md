@@ -7,8 +7,10 @@ It has the following features:
 1. Download TLE data from the Internet
 2. Display orbital elements for one or more satellites
 3. Calculate the position of a satellite at a given time
-4. Displaay upcomming satellite passes.
-   - The built-in pass calculator is still a work in progress, but the app can download pass information from the Internet.
+4. Calculate look angles (azimuth/elevation/range) for antenna pointing
+5. Check if a satellite is currently visible from your location
+6. Real-time satellite tracking with configurable update interval
+7. Predict upcoming satellite passes
 
 ## Build instructions
 
@@ -76,22 +78,20 @@ Saving TLE database to file: /home/andrew/.sattrack.tle
 Saving TLE database...  done.
 Saved 13526 TLE entries.
 
-# This doesn't work yet
-# $ sattrack passes 25544
+# Show upcomming passes
+$ sattrack passes 25544
 
-# Get the list of upcoming passes from N2YO
-$ sattrack n2yo passes 25544
-
-Loading Passes.... Done.
+Passes for ISS (ZARYA):
 
 Upcoming Passes:
         Satellite                   Start                      End               Duration        Starts In        Start Az      End Az       Max Az     Max Elev 
 ------------------------- ------------------------- ------------------------- -------------- ------------------ ------------ ------------ ------------ ----------
- 25544 SPACE STATION       2025-12-02 08:54:05 UTC   2025-12-02 09:04:40 UTC      10m 35s        0h 18m 36s      305.89 NW    146.38 SE    227.42 SW     44.89   
- 25544 SPACE STATION       2025-12-02 23:58:40 UTC   2025-12-03 00:08:45 UTC      10m  5s       15h 23m 11s      200.24 SSW    61.04 ENE   129.79 SE     24.05   
- 25544 SPACE STATION       2025-12-03 01:35:15 UTC   2025-12-03 01:45:35 UTC      10m 20s       16h 59m 46s      250.99 WSW    39.72 NE    324.91 NW     29.10   
- 25544 SPACE STATION       2025-12-03 06:29:55 UTC   2025-12-03 06:39:10 UTC       9m 15s       21h 54m 26s      325.74 NW     84.77 E      25.10 NNE    13.44   
- 25544 SPACE STATION       2025-12-03 08:06:25 UTC   2025-12-03 08:17:05 UTC      10m 40s       23h 30m 56s      311.42 NW    133.40 SE    179.33 S      88.33   
+ 25544 ISS (ZARYA)         2025-12-03 00:02:09 UTC   2025-12-03 00:06:01 UTC       3m 52s        0h 17m  9s      162.51 SSE    92.23 E     127.40 SE     14.56   
+ 25544 ISS (ZARYA)         2025-12-03 01:37:18 UTC   2025-12-03 01:43:52 UTC       6m 33s        1h 52m 18s      245.78 WSW    37.47 NE    322.04 NW     47.48   
+ 25544 ISS (ZARYA)         2025-12-03 03:17:46 UTC   2025-12-03 03:18:20 UTC       0m 33s        3h 32m 46s      334.48 NNW   343.97 NNW   339.22 NNW    10.08   
+ 25544 ISS (ZARYA)         2025-12-03 08:08:50 UTC   2025-12-03 08:15:20 UTC       6m 30s        8h 23m 50s      323.54 NW    112.49 ESE    37.93 NE     44.74   
+ 25544 ISS (ZARYA)         2025-12-03 09:46:33 UTC   2025-12-03 09:50:39 UTC       4m  5s       10h  1m 33s      269.94 W     194.63 SSW   232.24 SW     15.25   
+ 25544 ISS (ZARYA)         2025-12-04 00:49:48 UTC   2025-12-04 00:56:25 UTC       6m 37s       25h  4m 48s      213.26 SSW    56.44 ENE   135.35 SE     55.23  
 ```
 
 ### Commands
@@ -134,6 +134,61 @@ Calculates the geodetic location (latitude, longitude, altitude) of a satellite 
 sattrack geo 25544 --time "2025-12-01 12:00:00"
 ```
 
+#### `look` - Get look angles
+
+Calculates the look angles (azimuth, elevation, range) for antenna pointing. Uses TLE data from the local database.
+
+Options:
+
+- `--time <time>` - Time at which to get look angles (format: YYYY-MM-DD HH:MM:SS UTC, default: now)
+
+```sh
+sattrack --lat 35.58 --long 139.48 look 25544
+sattrack --lat 35.58 --long 139.48 look 25544 --time "2025-12-01 12:00:00"
+```
+
+#### `visible` - Check satellite visibility
+
+Checks if a satellite is currently visible (above the minimum elevation threshold) from your location.
+
+Options:
+
+- `--elev <n>` - Minimum elevation above the horizon in degrees (default 10)
+- `--time <time>` - Time at which to check visibility (format: YYYY-MM-DD HH:MM:SS UTC, default: now)
+
+```sh
+sattrack --lat 35.58 --long 139.48 visible 25544
+sattrack --lat 35.58 --long 139.48 visible 25544 --elev 5
+```
+
+#### `track` - Real-time tracking
+
+Provides real-time tracking output with configurable update interval and duration.
+
+Options:
+
+- `--interval <n>` - Update interval in seconds (default 1)
+- `--duration <n>` - Duration to track in seconds (default 60)
+
+```sh
+sattrack --lat 35.58 --long 139.48 track 25544
+sattrack --lat 35.58 --long 139.48 track 25544 --interval 5 --duration 300
+```
+
+#### `passes` - Predict satellite passes
+
+Predicts upcoming satellite passes using local TLE data. This command calculates passes locally without requiring an API key.
+
+Options:
+
+- `--days <n>` - Number of days to search for passes (default 1)
+- `--elev <n>` - Minimum pass elevation above the horizon in degrees (default 10)
+
+```sh
+sattrack --lat 35.58 --long 139.48 passes 25544
+sattrack --lat 35.58 --long 139.48 passes 25544 --days 2 --elev 20
+```
+
 #### `n2yo` - N2YO API commands
 
 Commands that fetch data from the N2YO API. These require an API key.
@@ -143,6 +198,7 @@ Commands that fetch data from the N2YO API. These require an API key.
 Shows upcoming passes for satellites, sorted by start time.
 
 Options:
+
 - `--key <key>` - N2YO API key
 - `--days <n>` - Number of days worth of passes to display (default 1, max 10)
 - `--elev <n>` - Minimum pass elevation above the horizon in degrees (default 10, max 90)
