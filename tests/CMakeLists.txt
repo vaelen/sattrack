@@ -10,6 +10,7 @@ include_directories(
 # Test source files (shared library sources, excluding main)
 set(LIB_SOURCES
     ${CMAKE_SOURCE_DIR}/src/orbit.cpp
+    ${CMAKE_SOURCE_DIR}/src/sgp4.cpp
 )
 
 # Orbit tests

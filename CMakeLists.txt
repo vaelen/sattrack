@@ -78,6 +78,7 @@ set(SOURCES
     src/celestrak.cpp
     src/config.cpp
     src/orbit.cpp
+    src/sgp4.cpp
     # Add more source files here as you create them
 )
 

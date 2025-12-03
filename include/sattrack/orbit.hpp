@@ -9,6 +9,8 @@
 #ifndef __SATTRACK_ORBIT_HPP
 #define __SATTRACK_ORBIT_HPP
 
+#include <sattrack/sgp4.hpp>
+
 #include <chrono>
 #include <cmath>
 #include <optional>
@@ -22,22 +24,10 @@ namespace sattrack {
 
 using time_point = std::chrono::system_clock::time_point;
 
-// ============================================================================
-// SGP4 Constants
-// ============================================================================
-
-// WGS84 / EGM-96 Constants
-constexpr double SGP4_MU = 398600.8;            // Earth gravitational parameter (km³/s²)
-constexpr double SGP4_RADIUS_EARTH_KM = 6378.135;  // Earth equatorial radius (km)
-constexpr double SGP4_J2 = 0.001082616;         // Second gravitational zonal harmonic
-constexpr double SGP4_J3 = -0.00000253881;      // Third gravitational zonal harmonic
-constexpr double SGP4_J4 = -0.00000165597;      // Fourth gravitational zonal harmonic
-constexpr double SGP4_J3OJ2 = SGP4_J3 / SGP4_J2;
-constexpr double SGP4_XKE = 0.0743669161331734132;  // sqrt(GM) in Earth radii^1.5/min
-constexpr double SGP4_TUMIN = 13.44683969695931;    // Minutes per time unit
-constexpr double SGP4_VKMPERSEC = 7.905366149846074; // km/s per velocity unit
-constexpr double SGP4_TWO_PI = 2.0 * M_PI;
-constexpr double SGP4_X2O3 = 2.0 / 3.0;
+// Re-export SGP4 exceptions
+using SGP4Exception = sgp4::SGP4Exception;
+using SatelliteDecayedException = sgp4::SatelliteDecayedException;
+using InvalidOrbitException = sgp4::InvalidOrbitException;
 
 // Astronomical constants
 constexpr double J2000_JD = 2451545.0;                      // Julian Date of J2000.0 epoch
@@ -52,34 +42,6 @@ constexpr double GMST_T3_DIVISOR = 38710000.0;  // Cubic correction divisor (T³
 // Degree-radian conversion factors
 constexpr double DEGREES_TO_RADIANS = M_PI / 180.0;
 constexpr double RADIANS_TO_DEGREES = 180.0 / M_PI;
-
-// ============================================================================
-// SGP4 Exception Classes
-// ============================================================================
-
-/**
- * Base exception class for SGP4 propagation errors.
- */
-class SGP4Exception : public std::runtime_error {
-public:
-    explicit SGP4Exception(const std::string& msg) : std::runtime_error(msg) {}
-};
-
-/**
- * Exception thrown when a satellite has decayed (re-entered atmosphere).
- */
-class SatelliteDecayedException : public SGP4Exception {
-public:
-    SatelliteDecayedException() : SGP4Exception("Satellite has decayed") {}
-};
-
-/**
- * Exception thrown when orbital elements are invalid.
- */
-class InvalidOrbitException : public SGP4Exception {
-public:
-    explicit InvalidOrbitException(const std::string& msg) : SGP4Exception(msg) {}
-};
 
 // ============================================================================
 // Basic Data Types
@@ -280,132 +242,14 @@ private:
     double meanMotion = 0.0;  // revolutions per day
     int revolutionNumberAtEpoch = 0;
 
-    // ========================================================================
-    // SGP4 State Variables (computed during initialization)
-    // ========================================================================
-
-    mutable bool sgp4Initialized_ = false;
-
-    // Epoch in Julian Date (split for precision)
-    mutable double jdsatepoch_ = 0.0;      // Integer part
-    mutable double jdsatepochF_ = 0.0;     // Fractional part
-
-    // Method flag: 'n' = near-earth (SGP4), 'd' = deep-space (SDP4)
-    mutable char method_ = 'n';
-
-    // Initialization flags
-    mutable bool isimp_ = false;           // Simple drag flag
-    mutable int irez_ = 0;                 // Resonance flag (0=none, 1=1-day, 2=0.5-day)
-
-    // Common orbital parameters
-    mutable double a_ = 0.0;               // Semi-major axis (Earth radii)
-    mutable double alta_ = 0.0;            // Altitude at apogee
-    mutable double altp_ = 0.0;            // Altitude at perigee
-    mutable double argpo_ = 0.0;           // Argument of perigee (rad)
-    mutable double bstar_ = 0.0;           // Drag term
-    mutable double ecco_ = 0.0;            // Eccentricity
-    mutable double inclo_ = 0.0;           // Inclination (rad)
-    mutable double mo_ = 0.0;              // Mean anomaly (rad)
-    mutable double no_kozai_ = 0.0;        // Mean motion (Kozai, rad/min)
-    mutable double no_unkozai_ = 0.0;      // Mean motion (un-Kozai'd, rad/min)
-    mutable double nodeo_ = 0.0;           // Right ascension (rad)
-    mutable double gsto_ = 0.0;            // Greenwich sidereal time at epoch
-    mutable double cosio2_ = 0.0;          // cosine of inclination squared
-    mutable double eccsq_ = 0.0;           // Eccentricity squared
-
-    // Near-earth coefficients
-    mutable double aycof_ = 0.0;
-    mutable double con41_ = 0.0;
-    mutable double cc1_ = 0.0, cc4_ = 0.0, cc5_ = 0.0;
-    mutable double d2_ = 0.0, d3_ = 0.0, d4_ = 0.0;
-    mutable double delmo_ = 0.0;
-    mutable double eta_ = 0.0;
-    mutable double argpdot_ = 0.0;
-    mutable double omgcof_ = 0.0;
-    mutable double sinmao_ = 0.0;
-    mutable double t2cof_ = 0.0, t3cof_ = 0.0, t4cof_ = 0.0, t5cof_ = 0.0;
-    mutable double x1mth2_ = 0.0;
-    mutable double x7thm1_ = 0.0;
-    mutable double mdot_ = 0.0;
-    mutable double nodedot_ = 0.0;
-    mutable double xlcof_ = 0.0;
-    mutable double xmcof_ = 0.0;
-    mutable double nodecf_ = 0.0;
-
-    // Deep space coefficients
-    mutable double e3_ = 0.0, ee2_ = 0.0;
-    mutable double peo_ = 0.0, pgho_ = 0.0, pho_ = 0.0, pinco_ = 0.0, plo_ = 0.0;
-    mutable double se2_ = 0.0, se3_ = 0.0, sgh2_ = 0.0, sgh3_ = 0.0, sgh4_ = 0.0;
-    mutable double sh2_ = 0.0, sh3_ = 0.0, si2_ = 0.0, si3_ = 0.0, sl2_ = 0.0;
-    mutable double sl3_ = 0.0, sl4_ = 0.0;
-    mutable double xgh2_ = 0.0, xgh3_ = 0.0, xgh4_ = 0.0;
-    mutable double xh2_ = 0.0, xh3_ = 0.0;
-    mutable double xi2_ = 0.0, xi3_ = 0.0;
-    mutable double xl2_ = 0.0, xl3_ = 0.0, xl4_ = 0.0;
-    mutable double xlamo_ = 0.0;
-    mutable double zmol_ = 0.0, zmos_ = 0.0;
-    mutable double atime_ = 0.0;
-    mutable double xli_ = 0.0, xni_ = 0.0;
-
-    // Resonance coefficients
-    mutable double d2201_ = 0.0, d2211_ = 0.0;
-    mutable double d3210_ = 0.0, d3222_ = 0.0;
-    mutable double d4410_ = 0.0, d4422_ = 0.0;
-    mutable double d5220_ = 0.0, d5232_ = 0.0, d5421_ = 0.0, d5433_ = 0.0;
-    mutable double del1_ = 0.0, del2_ = 0.0, del3_ = 0.0;
-    mutable double dedt_ = 0.0, didt_ = 0.0, dmdt_ = 0.0;
-    mutable double dnodt_ = 0.0, domdt_ = 0.0;
-
-    // ========================================================================
-    // SGP4 Private Methods
-    // ========================================================================
+    // SGP4 State 
+    mutable sgp4::State sgp4State_;
 
     /**
-     * Initialize SGP4 state from orbital elements.
+     * Ensure SGP4 state is initialized before propagation.
      * Called lazily on first propagation.
      */
-    void initializeSGP4() const;
-
-    /**
-     * Core SGP4/SDP4 propagation.
-     * @param tsince Minutes since epoch
-     * @param r Output position vector (km)
-     * @param v Output velocity vector (km/s)
-     */
-    void propagateSGP4(double tsince, double r[3], double v[3]) const;
-
-    /**
-     * Initialize deep space (SDP4) coefficients.
-     */
-    void initializeDeepSpace(
-        double tc, double& snodm, double& cnodm, double& sinim, double& cosim,
-        double& sinomm, double& cosomm, double& day, double& em, double& emsq,
-        double& gam, double& rtemsq, double& s1, double& s2, double& s3,
-        double& s4, double& s5, double& s6, double& s7, double& ss1,
-        double& ss2, double& ss3, double& ss4, double& ss5, double& ss6,
-        double& ss7, double& sz1, double& sz2, double& sz3, double& sz11,
-        double& sz12, double& sz13, double& sz21, double& sz22, double& sz23,
-        double& sz31, double& sz32, double& sz33, double& nm, double& z1,
-        double& z2, double& z3, double& z11, double& z12, double& z13,
-        double& z21, double& z22, double& z23, double& z31, double& z32,
-        double& z33
-    ) const;
-
-    /**
-     * Apply deep space secular effects.
-     */
-    void deepSpaceSecular(
-        double t, double& em, double& argpm, double& inclm,
-        double& nodem, double& mm, double& nm
-    ) const;
-
-    /**
-     * Apply deep space periodic effects.
-     */
-    void deepSpacePeriodic(
-        double t, double& em, double& inclm, double& nodem,
-        double& argpm, double& mm
-    ) const;
+    void ensureSGP4Initialized() const;
 };
 
 // ============================================================================
