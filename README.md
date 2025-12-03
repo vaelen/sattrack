@@ -184,11 +184,13 @@ Predicts upcoming satellite passes using local TLE data. This command calculates
 Options:
 
 - `--days <n>` - Number of days to search for passes (default 1)
-- `--elev <n>` - Minimum pass elevation above the horizon in degrees (default 10)
+- `--elev <n>` - Filters out passes whose maximum elevation is below this value, in degrees (default 10)
+- `--horizon <n>` - Passes start and end when the satellite crosses this elevation, in degrees (default 0)
 
 ```sh
 sattrack --lat 35.58 --long 139.48 passes 25544
 sattrack --lat 35.58 --long 139.48 passes 25544 --days 2 --elev 20
+sattrack --lat 35.58 --long 139.48 passes 25544 --horizon 10  # useful for antenna tracking
 ```
 
 #### `n2yo` - N2YO API commands
@@ -203,7 +205,7 @@ Options:
 
 - `--key <key>` - N2YO API key
 - `--days <n>` - Number of days worth of passes to display (default 1, max 10)
-- `--elev <n>` - Minimum pass elevation above the horizon in degrees (default 10, max 90)
+- `--elev <n>` - Filters out passes whose maximum elevation is below this value, in degrees (default 10)
 
 ```sh
 sattrack n2yo passes --key YOUR-API-KEY 25544
