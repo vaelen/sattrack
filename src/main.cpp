@@ -170,6 +170,7 @@ int main(int argc, char* argv[]) {
     config.setMinimumElevation(10);
     config.setVerbose(false);
     config.setTime(std::chrono::system_clock::now());
+    config.setHorizon(0);
 
     auto tleFilename = expandTilde("~/.sattrack.tle");
 
@@ -230,7 +231,7 @@ int main(int argc, char* argv[]) {
         "Number of days worth of passes to display (default 1, max 10)");
     n2yoPassesCommand->add_option_function<int>("--elev",
         [&config](const int elev) { config.setMinimumElevation(elev); },
-        "Minimum pass elevation above the horizon in degrees (default 10, max 90)");
+        "Filters out passes whose maximum elevation is below this number, in degrees (default 10)");
     n2yoPassesCommand->add_option("id", n2yoIDs, "Norad ID(s) of satellite(s)");
 
     auto satInfoCommand = app.add_subcommand("info", "View satellite information from the local TLE database");
@@ -310,8 +311,11 @@ int main(int argc, char* argv[]) {
         "Number of days to search for passes (default 1)");
     passesCommand->add_option_function<int>("--elev",
         [&config](const int elev) { config.setMinimumElevation(elev); },
-        "Minimum pass elevation above the horizon in degrees (default 10)");
-    
+        "Filters out passes whose maximum elevation is below this number, in degrees (default 10)");
+passesCommand->add_option_function<int>("--horizon",
+        [&config](const int elev) { config.setHorizon(elev); },
+        "Passes start and end when the satellite crosses this elevation, in degrees (default 0)");
+        
     geoCommand->add_option_function<std::string>("--time",
         [&config](const std::string &timeStr) {
             // Parse time string into time_point using date.h
@@ -691,7 +695,7 @@ int main(int argc, char* argv[]) {
                 config.getAltitude() / 1000.0
             };
 
-            double minElevRad = config.getMinimumElevation() * DEGREES_TO_RADIANS;
+            double minElevRad = config.getHorizon() * DEGREES_TO_RADIANS;
             auto searchDuration = std::chrono::hours(24 * config.getDays());
 
             std::vector<PassInfo> passes;
@@ -716,8 +720,10 @@ int main(int argc, char* argv[]) {
                         break;
                     }
 
-                    passCount++;
-                    passes.push_back(*pass);
+                    if (pass.value().maxAngles.elevationInRadians * RADIANS_TO_DEGREES >= config.getMinimumElevation()) {
+                        passCount++;
+                        passes.push_back(*pass);
+                    }
 
                     // Move past this pass
                     searchTime = pass->setTime + std::chrono::minutes(1);

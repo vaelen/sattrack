@@ -103,4 +103,24 @@ void Config::setTime(const time_point tp) {
     time = tp;
 }
 
+int Config::getHorizon() {
+    if (horizon >= 0 && horizon <= 90) {
+        return horizon;
+    }
+    if (horizon > 90) {
+        return 90;
+    }
+    return 0;
+}
+
+void Config::setHorizon(const int degrees) {
+    if (degrees >=0 && degrees <= 90) {
+        horizon = degrees;
+    } else if (degrees > 90) {
+        horizon = 90;
+    } else {
+        horizon = 0;
+    }
+}
+
 }

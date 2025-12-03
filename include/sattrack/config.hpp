@@ -44,6 +44,9 @@ public:
     bool getVerbose();
     void setVerbose(bool);
 
+    int getHorizon();
+    void setHorizon(int degrees);
+
     time_point getTime();
     void setTime(const time_point tp);
 private:
@@ -55,6 +58,7 @@ private:
     int minimumElevation;
     bool verbose;
     time_point time;
+    int horizon;
 };
 
 }
