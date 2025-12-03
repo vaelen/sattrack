@@ -375,7 +375,7 @@ passesCommand->add_option_function<int>("--horizon",
         try {
             for (auto noradID : n2yoIDs) {
                 auto response = n2yo::getTLE(config.getAPIKey(), noradID, config.getVerbose());
-                sattrack::Orbit orbit;
+                sattrack::Satellite orbit;
                 orbit.updateFromTLE(response.info.name, response.tle);
                 orbit.printInfo(std::cout);
             }
@@ -428,7 +428,7 @@ passesCommand->add_option_function<int>("--horizon",
                 std::cerr << satInfoCommand->help() << std::endl;
                 std::exit(1);
             }
-            std::map<int, sattrack::Orbit> satellites;
+            std::map<int, sattrack::Satellite> satellites;
             loadTLEDatabase(tleFilename, satellites);
             for (auto noradID : satInfoIDs) {
                 if (!satellites.contains(noradID)) {
@@ -451,7 +451,7 @@ passesCommand->add_option_function<int>("--horizon",
                 std::cerr << tleCommand->help() << std::endl;
                 std::exit(1);
             }
-            std::map<int, sattrack::Orbit> satellites;
+            std::map<int, sattrack::Satellite> satellites;
             loadTLEDatabase(tleFilename, satellites);
             for (auto noradID : satTLEIDs) {
                 if (!satellites.contains(noradID)) {
@@ -470,7 +470,7 @@ passesCommand->add_option_function<int>("--horizon",
 
     updateCommand->final_callback([&config, &groups, &tleFilename](void) {
         try {
-            std::map<int, sattrack::Orbit> satellites;
+            std::map<int, sattrack::Satellite> satellites;
             loadTLEDatabase(tleFilename, satellites);
 
             if (groups.empty()) {
@@ -481,7 +481,7 @@ passesCommand->add_option_function<int>("--horizon",
                 std::cout << "Downloading TLE data for group: " << group << "..." << std::flush;
                 auto response = celestrak::getTLE(group, config.getVerbose());
                 for (auto tle : response.entries) {
-                    sattrack::Orbit orbit;
+                    sattrack::Satellite orbit;
                     orbit.updateFromTLE(tle);
                     satellites[orbit.getNoradID()] = orbit;
                 }
@@ -503,7 +503,7 @@ passesCommand->add_option_function<int>("--horizon",
                 std::cerr << geoCommand->help() << std::endl;
                 std::exit(1);
             }
-            std::map<int, sattrack::Orbit> satellites;
+            std::map<int, sattrack::Satellite> satellites;
             loadTLEDatabase(tleFilename, satellites);
             for (auto noradID : geoIDs) {
                 if (!satellites.contains(noradID)) {
@@ -533,7 +533,7 @@ passesCommand->add_option_function<int>("--horizon",
                 std::cerr << lookCommand->help() << std::endl;
                 std::exit(1);
             }
-            std::map<int, sattrack::Orbit> satellites;
+            std::map<int, sattrack::Satellite> satellites;
             loadTLEDatabase(tleFilename, satellites);
 
             // Create observer from config (convert degrees to radians, meters to km)
@@ -576,7 +576,7 @@ passesCommand->add_option_function<int>("--horizon",
                 std::cerr << visibleCommand->help() << std::endl;
                 std::exit(1);
             }
-            std::map<int, sattrack::Orbit> satellites;
+            std::map<int, sattrack::Satellite> satellites;
             loadTLEDatabase(tleFilename, satellites);
 
             sattrack::Geodetic observer{
@@ -621,7 +621,7 @@ passesCommand->add_option_function<int>("--horizon",
                 std::cerr << trackCommand->help() << std::endl;
                 std::exit(1);
             }
-            std::map<int, sattrack::Orbit> satellites;
+            std::map<int, sattrack::Satellite> satellites;
             loadTLEDatabase(tleFilename, satellites);
 
             sattrack::Geodetic observer{
@@ -686,7 +686,7 @@ passesCommand->add_option_function<int>("--horizon",
                 std::cerr << passesCommand->help() << std::endl;
                 std::exit(1);
             }
-            std::map<int, sattrack::Orbit> satellites;
+            std::map<int, sattrack::Satellite> satellites;
             loadTLEDatabase(tleFilename, satellites);
 
             sattrack::Geodetic observer{

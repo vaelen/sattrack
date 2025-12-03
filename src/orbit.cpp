@@ -123,7 +123,7 @@ double gmst(double julianDate) {
 // ============================================================================
 
 // Ensure SGP4 state is initialized before propagation
-void Orbit::ensureSGP4Initialized() const {
+void Satellite::ensureSGP4Initialized() const {
     if (!sgp4State_.initialized) {
         sgp4::Elements elements{
             .epoch_jd = toJulianDate(epoch),
@@ -140,7 +140,7 @@ void Orbit::ensureSGP4Initialized() const {
 }
 
 // Get position in ECI coordinates at a given Julian Date
-Vec3 Orbit::getECI(double julianDate) const {
+Vec3 Satellite::getECI(double julianDate) const {
     ensureSGP4Initialized();
 
     // Time since epoch in minutes
@@ -152,7 +152,7 @@ Vec3 Orbit::getECI(double julianDate) const {
 }
 
 // Get velocity in ECI coordinates at a given Julian Date
-Vec3 Orbit::getVelocity(double julianDate) const {
+Vec3 Satellite::getVelocity(double julianDate) const {
     ensureSGP4Initialized();
 
     // Time since epoch in minutes
@@ -275,9 +275,9 @@ LookAngles getLookAngles(const Vec3& satECEF, const Geodetic& observer) {
 }
 
 // Compute look angles from observer to a satellite at a specific time
-LookAngles getLookAngles(const Orbit& orbit, const Geodetic& observer, double julianDate) {
+LookAngles getLookAngles(const Satellite& satellite, const Geodetic& observer, double julianDate) {
     // Get ECI coordinates using SGP4
-    Vec3 eci = orbit.getECI(julianDate);
+    Vec3 eci = satellite.getECI(julianDate);
 
     // Convert ECI to ECEF using Greenwich Sidereal Time
     double gst = gmst(julianDate);
@@ -293,16 +293,16 @@ bool isVisible(const LookAngles& angles, double minElevationInRadians) {
 }
 
 // Check visibility of a satellite at a specific time
-bool isVisible(const Orbit& orbit, const Geodetic& observer,
+bool isVisible(const Satellite& satellite, const Geodetic& observer,
                double julianDate, double minElevationInRadians) {
-    LookAngles angles = getLookAngles(orbit, observer, julianDate);
+    LookAngles angles = getLookAngles(satellite, observer, julianDate);
     return isVisible(angles, minElevationInRadians);
 }
 
 // Helper: Get elevation at a specific time
-static double getElevationAtTime(const Orbit& orbit, const Geodetic& observer, time_point t) {
+static double getElevationAtTime(const Satellite& satellite, const Geodetic& observer, time_point t) {
     double jd = toJulianDate(t);
-    LookAngles angles = getLookAngles(orbit, observer, jd);
+    LookAngles angles = getLookAngles(satellite, observer, jd);
     return angles.elevationInRadians;
 }
 
@@ -310,7 +310,7 @@ static double getElevationAtTime(const Orbit& orbit, const Geodetic& observer, t
 // Returns the time when elevation crosses the threshold
 // 'rising' indicates if we're looking for a rise (true) or set (false)
 static time_point binarySearchCrossing(
-    const Orbit& orbit,
+    const Satellite& satellite,
     const Geodetic& observer,
     double threshold,
     time_point low,
@@ -322,7 +322,7 @@ static time_point binarySearchCrossing(
     // Refine to within 1 second
     while (duration_cast<seconds>(high - low).count() > 1) {
         time_point mid = low + (high - low) / 2;
-        double elev = getElevationAtTime(orbit, observer, mid);
+        double elev = getElevationAtTime(satellite, observer, mid);
 
         bool aboveThreshold = elev >= threshold;
 
@@ -351,7 +351,7 @@ static time_point binarySearchCrossing(
 // Helper: Golden section search to find maximum elevation time
 // Returns the time when elevation is at maximum between low and high
 static time_point goldenSectionSearchMax(
-    const Orbit& orbit,
+    const Satellite& satellite,
     const Geodetic& observer,
     time_point low,
     time_point high) {
@@ -365,8 +365,8 @@ static time_point goldenSectionSearchMax(
     time_point x1 = low + duration_cast<system_clock::duration>(duration * RESPHI);
     time_point x2 = high - duration_cast<system_clock::duration>(duration * RESPHI);
 
-    double f1 = getElevationAtTime(orbit, observer, x1);
-    double f2 = getElevationAtTime(orbit, observer, x2);
+    double f1 = getElevationAtTime(satellite, observer, x1);
+    double f2 = getElevationAtTime(satellite, observer, x2);
 
     // Refine to within 1 second
     while (duration_cast<seconds>(high - low).count() > 1) {
@@ -376,14 +376,14 @@ static time_point goldenSectionSearchMax(
             f2 = f1;
             duration = high - low;
             x1 = low + duration_cast<system_clock::duration>(duration * RESPHI);
-            f1 = getElevationAtTime(orbit, observer, x1);
+            f1 = getElevationAtTime(satellite, observer, x1);
         } else {
             low = x1;
             x1 = x2;
             f1 = f2;
             duration = high - low;
             x2 = high - duration_cast<system_clock::duration>(duration * RESPHI);
-            f2 = getElevationAtTime(orbit, observer, x2);
+            f2 = getElevationAtTime(satellite, observer, x2);
         }
     }
 
@@ -393,7 +393,7 @@ static time_point goldenSectionSearchMax(
 
 // Find the next satellite pass over an observer's location
 std::optional<PassInfo> findNextPass(
-    const Orbit& orbit,
+    const Satellite& satellite,
     const Geodetic& observer,
     double minElevationInRadians,
     time_point startTime) {
@@ -408,13 +408,13 @@ std::optional<PassInfo> findNextPass(
     auto currentTime = startTime;
 
     // Track visibility state
-    bool wasVisible = isVisible(orbit, observer, toJulianDate(currentTime), minElevationInRadians);
+    bool wasVisible = isVisible(satellite, observer, toJulianDate(currentTime), minElevationInRadians);
 
     // If we start during a pass, skip to the end of it first
     if (wasVisible) {
         while (currentTime < searchEnd) {
             currentTime += COARSE_STEP;
-            bool nowVisible = isVisible(orbit, observer, toJulianDate(currentTime), minElevationInRadians);
+            bool nowVisible = isVisible(satellite, observer, toJulianDate(currentTime), minElevationInRadians);
             if (!nowVisible) {
                 wasVisible = false;
                 break;
@@ -433,7 +433,7 @@ std::optional<PassInfo> findNextPass(
 
     while (currentTime < searchEnd) {
         currentTime += COARSE_STEP;
-        bool nowVisible = isVisible(orbit, observer, toJulianDate(currentTime), minElevationInRadians);
+        bool nowVisible = isVisible(satellite, observer, toJulianDate(currentTime), minElevationInRadians);
 
         if (!wasVisible && nowVisible) {
             // Found rise
@@ -462,29 +462,29 @@ std::optional<PassInfo> findNextPass(
 
     // Binary search refinement for precise rise time
     time_point preciseRise = binarySearchCrossing(
-        orbit, observer, minElevationInRadians,
+        satellite, observer, minElevationInRadians,
         coarseRise, coarseRise + COARSE_STEP, true);
 
     // Binary search refinement for precise set time
     time_point preciseSet = binarySearchCrossing(
-        orbit, observer, minElevationInRadians,
+        satellite, observer, minElevationInRadians,
         coarseSet - COARSE_STEP, coarseSet, false);
 
     // Golden section search for maximum elevation time
-    time_point maxTime = goldenSectionSearchMax(orbit, observer, preciseRise, preciseSet);
+    time_point maxTime = goldenSectionSearchMax(satellite, observer, preciseRise, preciseSet);
 
     // Compute look angles at each key time
     double riseJD = toJulianDate(preciseRise);
     double maxJD = toJulianDate(maxTime);
     double setJD = toJulianDate(preciseSet);
 
-    LookAngles riseAngles = getLookAngles(orbit, observer, riseJD);
-    LookAngles maxAngles = getLookAngles(orbit, observer, maxJD);
-    LookAngles setAngles = getLookAngles(orbit, observer, setJD);
+    LookAngles riseAngles = getLookAngles(satellite, observer, riseJD);
+    LookAngles maxAngles = getLookAngles(satellite, observer, maxJD);
+    LookAngles setAngles = getLookAngles(satellite, observer, setJD);
 
     return PassInfo{
-        .noradID = orbit.getNoradID(),
-        .name = orbit.getName(),
+        .noradID = satellite.getNoradID(),
+        .name = satellite.getName(),
         .riseTime = preciseRise,
         .maxElevationTime = maxTime,
         .setTime = preciseSet,
@@ -495,13 +495,13 @@ std::optional<PassInfo> findNextPass(
 }
 
 // Get geodetic location (lat, lon, alt) of the satellite at a given time
-Geodetic Orbit::getGeodeticLocationAtTime(const time_point tp) const {
+Geodetic Satellite::getGeodeticLocationAtTime(const time_point tp) const {
     double julianDate = toJulianDate(tp);
     return getGeodeticLocationAtTime(julianDate);
 }
 
 // Get geodetic location (lat, lon, alt) of the satellite at a given time
-Geodetic Orbit::getGeodeticLocationAtTime(const double julianDate) const {
+Geodetic Satellite::getGeodeticLocationAtTime(const double julianDate) const {
     // Get ECI coordinates using SGP4
     Vec3 eci = getECI(julianDate);
 
@@ -516,13 +516,13 @@ Geodetic Orbit::getGeodeticLocationAtTime(const double julianDate) const {
 }
 
 // Update orbital elements from TLE data with a seperate name
-void Orbit::updateFromTLE(const std::string_view &name, const std::string_view &tle) {
+void Satellite::updateFromTLE(const std::string_view &name, const std::string_view &tle) {
     updateFromTLE(tle);
     this->name = std::string(name);
 }
 
 // Update orbital elements from TLE data
-void Orbit::updateFromTLE(const std::string_view &tle) {
+void Satellite::updateFromTLE(const std::string_view &tle) {
     // Reset SGP4 initialization state so it re-initializes on next propagation
     sgp4State_.initialized = false;
 
@@ -576,71 +576,71 @@ void Orbit::updateFromTLE(const std::string_view &tle) {
     }
 }
 
-int Orbit::getNoradID() const {
+int Satellite::getNoradID() const {
     return noradID;
 }
 
-char Orbit::getClassification() const {
+char Satellite::getClassification() const {
     return classification;
 }
 
-std::string Orbit::getDesignator() const {
+std::string Satellite::getDesignator() const {
     return designator;
 }
 
-time_point Orbit::getEpoch() const {
+time_point Satellite::getEpoch() const {
     return epoch;
 }
 
-double Orbit::getFirstDerivativeMeanMotion() const {
+double Satellite::getFirstDerivativeMeanMotion() const {
     return firstDerivativeMeanMotion;
 }
 
-double Orbit::getSecondDerivativeMeanMotion() const {
+double Satellite::getSecondDerivativeMeanMotion() const {
     return secondDerivativeMeanMotion;
 }
 
-double Orbit::getBstarDragTerm() const {
+double Satellite::getBstarDragTerm() const {
     return bstarDragTerm;
 }
 
-int Orbit::getElementSetNumber() const {
+int Satellite::getElementSetNumber() const {
     return elementSetNumber;
 }
 
-double Orbit::getInclination() const {
+double Satellite::getInclination() const {
     return inclination;
 }
 
-double Orbit::getRightAscensionOfAscendingNode() const {
+double Satellite::getRightAscensionOfAscendingNode() const {
     return rightAscensionOfAscendingNode;
 }
 
-double Orbit::getEccentricity() const {
+double Satellite::getEccentricity() const {
     return eccentricity;
 }
 
-double Orbit::getArgumentOfPerigee() const {
+double Satellite::getArgumentOfPerigee() const {
     return argumentOfPerigee;
 }
 
-double Orbit::getMeanAnomaly() const {
+double Satellite::getMeanAnomaly() const {
     return meanAnomaly;
 }
 
-double Orbit::getMeanMotion() const {
+double Satellite::getMeanMotion() const {
     return meanMotion;
 }
 
-int Orbit::getRevolutionNumberAtEpoch() const {
+int Satellite::getRevolutionNumberAtEpoch() const {
     return revolutionNumberAtEpoch;
 }
 
-std::string Orbit::getName() const {
+std::string Satellite::getName() const {
     return name;
 }
 
-void Orbit::printInfo(std::ostream &os) const {
+void Satellite::printInfo(std::ostream &os) const {
     os << getName() << std::endl;
     os << "  NORAD ID: " << getNoradID() << std::endl;
     os << "  Classification: " << getClassification() << std::endl;
@@ -720,7 +720,7 @@ std::string formatFirstDerivative(double value) {
 }
 
 // Get standard 3-line TLE representation of the orbital elements
-std::string Orbit::getTLE() const {
+std::string Satellite::getTLE() const {
     using namespace std::chrono;
 
     std::ostringstream tleStream;
@@ -832,7 +832,7 @@ std::string Orbit::getTLE() const {
 }
 
 // Load TLE database from file using the standard 3-line TLE format
-void loadTLEDatabase(const std::string &filepath, std::map<int, Orbit> &database, std::ostream &logStream) {
+void loadTLEDatabase(const std::string &filepath, std::map<int, Satellite> &database, std::ostream &logStream) {
     logStream << "Loading TLE database from file: " << filepath << std::endl;
     if (!std::filesystem::exists(filepath)) {
         logStream << "TLE database file does not exist: " + filepath << std::endl;
@@ -846,7 +846,7 @@ void loadTLEDatabase(const std::string &filepath, std::map<int, Orbit> &database
 }
 
 // Load TLE database from stream using the standard 3-line TLE format
-void loadTLEDatabase(std::istream &s, std::map<int, Orbit> &database, std::ostream &logStream) {
+void loadTLEDatabase(std::istream &s, std::map<int, Satellite> &database, std::ostream &logStream) {
     bool haveFirstLine = false;
     bool haveSecondLine = false;
     std::string line, line1, line2, nameLine;
@@ -866,14 +866,14 @@ void loadTLEDatabase(std::istream &s, std::map<int, Orbit> &database, std::ostre
         }
 
         if (haveFirstLine && haveSecondLine) {
-            Orbit orbit;
+            Satellite satellite;
 
             std::ostringstream tleStream;
             tleStream << nameLine << '\n' << line1 << '\n' << line2 << '\n';
 
-            orbit.updateFromTLE(tleStream.str());
+            satellite.updateFromTLE(tleStream.str());
 
-            database[orbit.getNoradID()] = orbit;
+            database[satellite.getNoradID()] = satellite;
 
             haveFirstLine = false;
             haveSecondLine = false;
@@ -889,7 +889,7 @@ void loadTLEDatabase(std::istream &s, std::map<int, Orbit> &database, std::ostre
 }
 
 // Save TLE database to file using the standard 3-line TLE format
-void saveTLEDatabase(const std::string &filepath, const std::map<int, Orbit> &database, std::ostream &logStream) {
+void saveTLEDatabase(const std::string &filepath, const std::map<int, Satellite> &database, std::ostream &logStream) {
     std::ofstream file(filepath);
     logStream << "Saving TLE database to file: " << filepath << std::endl;
     if (!file.is_open()) {
@@ -899,11 +899,11 @@ void saveTLEDatabase(const std::string &filepath, const std::map<int, Orbit> &da
 }
 
 // Save TLE database to stream using the standard 3-line TLE format
-void saveTLEDatabase(std::ostream &s, const std::map<int, Orbit> &database, std::ostream &logStream) {
+void saveTLEDatabase(std::ostream &s, const std::map<int, Satellite> &database, std::ostream &logStream) {
     logStream << "Saving TLE database... " << std::flush;
     int count = 0;
-    for (const auto &[id, orbit] : database) {
-        s << orbit.getTLE();
+    for (const auto &[id, satellite] : database) {
+        s << satellite.getTLE();
         count++;
     }
     logStream << " done." << std::endl;

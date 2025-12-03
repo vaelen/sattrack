@@ -125,7 +125,7 @@ struct PassInfo {
 };
 
 // ============================================================================
-// Orbit Class with SGP4 Propagation
+// Satellite Class with SGP4 Propagation
 // ============================================================================
 
 /**
@@ -135,17 +135,17 @@ struct PassInfo {
  * and SDP4 is used for deep-space satellites (orbital period >= 225 min).
  *
  * Usage:
- *   Orbit orbit;
- *   orbit.updateFromTLE(tleString);
- *   Vec3 position = orbit.getECI(julianDate);
+ *   Satellite sat;
+ *   sat.updateFromTLE(tleString);
+ *   Vec3 position = sat.getECI(julianDate);
  *
  * Note: This class is not thread-safe for the same instance. The mutable SGP4
  * state is initialized lazily on first propagation.
  */
-class Orbit {
+class Satellite {
 public:
-    Orbit() = default;
-    ~Orbit() = default;
+    Satellite() = default;
+    ~Satellite() = default;
 
     /**
      * Update orbital elements from a TLE string with a separate name.
@@ -256,10 +256,10 @@ private:
 // TLE Database Functions
 // ============================================================================
 
-void loadTLEDatabase(std::istream &s, std::map<int, Orbit> &database, std::ostream &logStream = std::cerr);
-void loadTLEDatabase(const std::string &filepath, std::map<int, Orbit> &database, std::ostream &logStream = std::cerr);
-void saveTLEDatabase(std::ostream &s, const std::map<int, Orbit> &database, std::ostream &logStream = std::cerr);
-void saveTLEDatabase(const std::string &filepath, const std::map<int, Orbit> &database, std::ostream &logStream = std::cerr);
+void loadTLEDatabase(std::istream &s, std::map<int, Satellite> &database, std::ostream &logStream = std::cerr);
+void loadTLEDatabase(const std::string &filepath, std::map<int, Satellite> &database, std::ostream &logStream = std::cerr);
+void saveTLEDatabase(std::ostream &s, const std::map<int, Satellite> &database, std::ostream &logStream = std::cerr);
+void saveTLEDatabase(const std::string &filepath, const std::map<int, Satellite> &database, std::ostream &logStream = std::cerr);
 
 // TLE formatting utilities
 int calculateChecksum(const std::string& line);
@@ -308,7 +308,7 @@ LookAngles getLookAngles(const Vec3& satECEF, const Geodetic& observer);
 /**
  * Computes look angles from an observer to a satellite at a specific time.
  */
-LookAngles getLookAngles(const Orbit& orbit, const Geodetic& observer, double julianDate);
+LookAngles getLookAngles(const Satellite& satellite, const Geodetic& observer, double julianDate);
 
 /**
  * Checks if a satellite is visible based on its look angles.
@@ -318,14 +318,14 @@ bool isVisible(const LookAngles& angles, double minElevationInRadians);
 /**
  * Checks if a satellite is visible from an observer at a specific time.
  */
-bool isVisible(const Orbit& orbit, const Geodetic& observer,
+bool isVisible(const Satellite& satellite, const Geodetic& observer,
                double julianDate, double minElevationInRadians);
 
 /**
  * Finds the next satellite pass over an observer's location.
  */
 std::optional<PassInfo> findNextPass(
-    const Orbit& orbit,
+    const Satellite& satellite,
     const Geodetic& observer,
     double minElevationInRadians,
     time_point startTime);

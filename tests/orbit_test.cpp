@@ -31,170 +31,170 @@ constexpr const char* TLE_WITH_NAME =
     "1 25544U 98067A   25333.83453771  .00008010  00000+0  15237-3 0  9993\n"
     "2 25544  51.6312 206.3646 0003723 184.1118 175.9840 15.49193835540850";
 
-class OrbitTest : public ::testing::Test {
+class SatelliteTest : public ::testing::Test {
 protected:
-    Orbit orbit;
+    Satellite satellite;
 };
 
 // Test default construction
-TEST_F(OrbitTest, DefaultConstruction) {
-    Orbit defaultOrbit;
+TEST_F(SatelliteTest, DefaultConstruction) {
+    Satellite defaultSatellite;
     // Default constructed orbit has uninitialized numeric members
     // but string should be empty (std::string default constructor)
-    EXPECT_TRUE(defaultOrbit.getDesignator().empty());
-    EXPECT_TRUE(defaultOrbit.getName().empty());
+    EXPECT_TRUE(defaultSatellite.getDesignator().empty());
+    EXPECT_TRUE(defaultSatellite.getName().empty());
 }
 
 // Test parsing ISS TLE - Line 1 fields
-TEST_F(OrbitTest, ParseISSLine1_NoradID) {
-    orbit.updateFromTLE(ISS_TLE);
-    EXPECT_EQ(orbit.getNoradID(), 25544);
+TEST_F(SatelliteTest, ParseISSLine1_NoradID) {
+    satellite.updateFromTLE(ISS_TLE);
+    EXPECT_EQ(satellite.getNoradID(), 25544);
 }
 
-TEST_F(OrbitTest, ParseISSLine1_Classification) {
-    orbit.updateFromTLE(ISS_TLE);
-    EXPECT_EQ(orbit.getClassification(), 'U');
+TEST_F(SatelliteTest, ParseISSLine1_Classification) {
+    satellite.updateFromTLE(ISS_TLE);
+    EXPECT_EQ(satellite.getClassification(), 'U');
 }
 
-TEST_F(OrbitTest, ParseISSLine1_Designator) {
-    orbit.updateFromTLE(ISS_TLE);
-    EXPECT_EQ(orbit.getDesignator(), "98067A  ");
+TEST_F(SatelliteTest, ParseISSLine1_Designator) {
+    satellite.updateFromTLE(ISS_TLE);
+    EXPECT_EQ(satellite.getDesignator(), "98067A  ");
 }
 
-TEST_F(OrbitTest, ParseISSLine1_FirstDerivativeMeanMotion) {
-    orbit.updateFromTLE(ISS_TLE);
-    EXPECT_NEAR(orbit.getFirstDerivativeMeanMotion(), 0.00008010, 1e-8);
+TEST_F(SatelliteTest, ParseISSLine1_FirstDerivativeMeanMotion) {
+    satellite.updateFromTLE(ISS_TLE);
+    EXPECT_NEAR(satellite.getFirstDerivativeMeanMotion(), 0.00008010, 1e-8);
 }
 
-TEST_F(OrbitTest, ParseISSLine1_SecondDerivativeMeanMotion) {
-    orbit.updateFromTLE(ISS_TLE);
+TEST_F(SatelliteTest, ParseISSLine1_SecondDerivativeMeanMotion) {
+    satellite.updateFromTLE(ISS_TLE);
     // "00000+0" should parse to 0.0
-    EXPECT_NEAR(orbit.getSecondDerivativeMeanMotion(), 0.0, 1e-10);
+    EXPECT_NEAR(satellite.getSecondDerivativeMeanMotion(), 0.0, 1e-10);
 }
 
-TEST_F(OrbitTest, ParseISSLine1_BstarDragTerm) {
-    orbit.updateFromTLE(ISS_TLE);
+TEST_F(SatelliteTest, ParseISSLine1_BstarDragTerm) {
+    satellite.updateFromTLE(ISS_TLE);
     // "15237-3" -> 0.00015237
-    EXPECT_NEAR(orbit.getBstarDragTerm(), 0.00015237, 1e-8);
+    EXPECT_NEAR(satellite.getBstarDragTerm(), 0.00015237, 1e-8);
 }
 
-TEST_F(OrbitTest, ParseISSLine1_ElementSetNumber) {
-    orbit.updateFromTLE(ISS_TLE);
-    EXPECT_EQ(orbit.getElementSetNumber(), 999);
+TEST_F(SatelliteTest, ParseISSLine1_ElementSetNumber) {
+    satellite.updateFromTLE(ISS_TLE);
+    EXPECT_EQ(satellite.getElementSetNumber(), 999);
 }
 
 // Test parsing ISS TLE - Line 2 fields
-TEST_F(OrbitTest, ParseISSLine2_Inclination) {
-    orbit.updateFromTLE(ISS_TLE);
-    EXPECT_DOUBLE_EQ(orbit.getInclination(), 51.6312);
+TEST_F(SatelliteTest, ParseISSLine2_Inclination) {
+    satellite.updateFromTLE(ISS_TLE);
+    EXPECT_DOUBLE_EQ(satellite.getInclination(), 51.6312);
 }
 
-TEST_F(OrbitTest, ParseISSLine2_RAAN) {
-    orbit.updateFromTLE(ISS_TLE);
-    EXPECT_DOUBLE_EQ(orbit.getRightAscensionOfAscendingNode(), 206.3646);
+TEST_F(SatelliteTest, ParseISSLine2_RAAN) {
+    satellite.updateFromTLE(ISS_TLE);
+    EXPECT_DOUBLE_EQ(satellite.getRightAscensionOfAscendingNode(), 206.3646);
 }
 
-TEST_F(OrbitTest, ParseISSLine2_Eccentricity) {
-    orbit.updateFromTLE(ISS_TLE);
+TEST_F(SatelliteTest, ParseISSLine2_Eccentricity) {
+    satellite.updateFromTLE(ISS_TLE);
     // "0003723" -> 0.0003723
-    EXPECT_NEAR(orbit.getEccentricity(), 0.0003723, 1e-8);
+    EXPECT_NEAR(satellite.getEccentricity(), 0.0003723, 1e-8);
 }
 
-TEST_F(OrbitTest, ParseISSLine2_ArgumentOfPerigee) {
-    orbit.updateFromTLE(ISS_TLE);
-    EXPECT_DOUBLE_EQ(orbit.getArgumentOfPerigee(), 184.1118);
+TEST_F(SatelliteTest, ParseISSLine2_ArgumentOfPerigee) {
+    satellite.updateFromTLE(ISS_TLE);
+    EXPECT_DOUBLE_EQ(satellite.getArgumentOfPerigee(), 184.1118);
 }
 
-TEST_F(OrbitTest, ParseISSLine2_MeanAnomaly) {
-    orbit.updateFromTLE(ISS_TLE);
-    EXPECT_DOUBLE_EQ(orbit.getMeanAnomaly(), 175.9840);
+TEST_F(SatelliteTest, ParseISSLine2_MeanAnomaly) {
+    satellite.updateFromTLE(ISS_TLE);
+    EXPECT_DOUBLE_EQ(satellite.getMeanAnomaly(), 175.9840);
 }
 
-TEST_F(OrbitTest, ParseISSLine2_MeanMotion) {
-    orbit.updateFromTLE(ISS_TLE);
-    EXPECT_NEAR(orbit.getMeanMotion(), 15.49193835, 1e-6);
+TEST_F(SatelliteTest, ParseISSLine2_MeanMotion) {
+    satellite.updateFromTLE(ISS_TLE);
+    EXPECT_NEAR(satellite.getMeanMotion(), 15.49193835, 1e-6);
 }
 
-TEST_F(OrbitTest, ParseISSLine2_RevolutionNumber) {
-    orbit.updateFromTLE(ISS_TLE);
-    EXPECT_EQ(orbit.getRevolutionNumberAtEpoch(), 54085);
+TEST_F(SatelliteTest, ParseISSLine2_RevolutionNumber) {
+    satellite.updateFromTLE(ISS_TLE);
+    EXPECT_EQ(satellite.getRevolutionNumberAtEpoch(), 54085);
 }
 
 // Test parsing NOAA-19 TLE for different values
-TEST_F(OrbitTest, ParseNOAA19_NoradID) {
-    orbit.updateFromTLE(NOAA19_TLE);
-    EXPECT_EQ(orbit.getNoradID(), 33591);
+TEST_F(SatelliteTest, ParseNOAA19_NoradID) {
+    satellite.updateFromTLE(NOAA19_TLE);
+    EXPECT_EQ(satellite.getNoradID(), 33591);
 }
 
-TEST_F(OrbitTest, ParseNOAA19_Inclination) {
-    orbit.updateFromTLE(NOAA19_TLE);
-    EXPECT_DOUBLE_EQ(orbit.getInclination(), 98.9785);
+TEST_F(SatelliteTest, ParseNOAA19_Inclination) {
+    satellite.updateFromTLE(NOAA19_TLE);
+    EXPECT_DOUBLE_EQ(satellite.getInclination(), 98.9785);
 }
 
-TEST_F(OrbitTest, ParseNOAA19_BstarDragTerm) {
-    orbit.updateFromTLE(NOAA19_TLE);
+TEST_F(SatelliteTest, ParseNOAA19_BstarDragTerm) {
+    satellite.updateFromTLE(NOAA19_TLE);
     // "52635-4" -> 0.000052635
-    EXPECT_NEAR(orbit.getBstarDragTerm(), 0.000052635, 1e-9);
+    EXPECT_NEAR(satellite.getBstarDragTerm(), 0.000052635, 1e-9);
 }
 
-TEST_F(OrbitTest, ParseNOAA19_MeanMotion) {
-    orbit.updateFromTLE(NOAA19_TLE);
-    EXPECT_NEAR(orbit.getMeanMotion(), 14.13431889, 1e-6);
+TEST_F(SatelliteTest, ParseNOAA19_MeanMotion) {
+    satellite.updateFromTLE(NOAA19_TLE);
+    EXPECT_NEAR(satellite.getMeanMotion(), 14.13431889, 1e-6);
 }
 
 // Test three-line format (with satellite name)
-TEST_F(OrbitTest, ParseThreeLineFormat) {
-    orbit.updateFromTLE(TLE_WITH_NAME);
-    EXPECT_EQ(orbit.getNoradID(), 25544);
-    EXPECT_DOUBLE_EQ(orbit.getInclination(), 51.6312);
+TEST_F(SatelliteTest, ParseThreeLineFormat) {
+    satellite.updateFromTLE(TLE_WITH_NAME);
+    EXPECT_EQ(satellite.getNoradID(), 25544);
+    EXPECT_DOUBLE_EQ(satellite.getInclination(), 51.6312);
 }
 
 // ============================================================================
 // Name Parsing Tests
 // ============================================================================
 
-TEST_F(OrbitTest, GetName_TwoLineFormat) {
+TEST_F(SatelliteTest, GetName_TwoLineFormat) {
     // Two-line TLE format should result in empty name
-    orbit.updateFromTLE(ISS_TLE);
-    EXPECT_TRUE(orbit.getName().empty());
+    satellite.updateFromTLE(ISS_TLE);
+    EXPECT_TRUE(satellite.getName().empty());
 }
 
-TEST_F(OrbitTest, GetName_ThreeLineFormat) {
+TEST_F(SatelliteTest, GetName_ThreeLineFormat) {
     // Three-line TLE format should parse the name from the first line
-    orbit.updateFromTLE(TLE_WITH_NAME);
-    EXPECT_EQ(orbit.getName(), "ISS (ZARYA)");
+    satellite.updateFromTLE(TLE_WITH_NAME);
+    EXPECT_EQ(satellite.getName(), "ISS (ZARYA)");
 }
 
-TEST_F(OrbitTest, UpdateFromTLE_WithExplicitName) {
+TEST_F(SatelliteTest, UpdateFromTLE_WithExplicitName) {
     // Using the overload that accepts a separate name
-    orbit.updateFromTLE("My Custom Name", ISS_TLE);
-    EXPECT_EQ(orbit.getName(), "My Custom Name");
+    satellite.updateFromTLE("My Custom Name", ISS_TLE);
+    EXPECT_EQ(satellite.getName(), "My Custom Name");
     // Should still parse the orbital elements correctly
-    EXPECT_EQ(orbit.getNoradID(), 25544);
-    EXPECT_DOUBLE_EQ(orbit.getInclination(), 51.6312);
+    EXPECT_EQ(satellite.getNoradID(), 25544);
+    EXPECT_DOUBLE_EQ(satellite.getInclination(), 51.6312);
 }
 
-TEST_F(OrbitTest, UpdateFromTLE_ExplicitNameOverridesEmbeddedName) {
+TEST_F(SatelliteTest, UpdateFromTLE_ExplicitNameOverridesEmbeddedName) {
     // When using the overload with explicit name, it should override
     // any name that might be embedded in the TLE
-    orbit.updateFromTLE("Override Name", TLE_WITH_NAME);
-    EXPECT_EQ(orbit.getName(), "Override Name");
+    satellite.updateFromTLE("Override Name", TLE_WITH_NAME);
+    EXPECT_EQ(satellite.getName(), "Override Name");
 }
 
-TEST_F(OrbitTest, GetName_TrimsWhitespace) {
+TEST_F(SatelliteTest, GetName_TrimsWhitespace) {
     // Test that leading/trailing whitespace is trimmed from name
     constexpr const char* TLE_WITH_PADDED_NAME =
         "  NOAA 19  \n"
         "1 33591U 09005A   25333.78204194  .00000054  00000+0  52635-4 0  9999\n"
         "2 33591  98.9785  39.2910 0013037 231.6546 128.3455 14.13431889866318";
-    orbit.updateFromTLE(TLE_WITH_PADDED_NAME);
-    EXPECT_EQ(orbit.getName(), "NOAA 19");
+    satellite.updateFromTLE(TLE_WITH_PADDED_NAME);
+    EXPECT_EQ(satellite.getName(), "NOAA 19");
 }
 
 // Test epoch parsing
-TEST_F(OrbitTest, EpochParsing) {
-    orbit.updateFromTLE(ISS_TLE);
-    auto epoch = orbit.getEpoch();
+TEST_F(SatelliteTest, EpochParsing) {
+    satellite.updateFromTLE(ISS_TLE);
+    auto epoch = satellite.getEpoch();
 
     // Convert to time_t for easier verification
     auto time_t_epoch = std::chrono::system_clock::to_time_t(epoch);
@@ -207,73 +207,73 @@ TEST_F(OrbitTest, EpochParsing) {
 }
 
 // Test updating orbit with new TLE
-TEST_F(OrbitTest, UpdateWithNewTLE) {
-    orbit.updateFromTLE(ISS_TLE);
-    EXPECT_EQ(orbit.getNoradID(), 25544);
+TEST_F(SatelliteTest, UpdateWithNewTLE) {
+    satellite.updateFromTLE(ISS_TLE);
+    EXPECT_EQ(satellite.getNoradID(), 25544);
 
-    orbit.updateFromTLE(NOAA19_TLE);
-    EXPECT_EQ(orbit.getNoradID(), 33591);
+    satellite.updateFromTLE(NOAA19_TLE);
+    EXPECT_EQ(satellite.getNoradID(), 33591);
 }
 
 // Test orbital element ranges (sanity checks)
-TEST_F(OrbitTest, InclinationRange) {
-    orbit.updateFromTLE(ISS_TLE);
-    double incl = orbit.getInclination();
+TEST_F(SatelliteTest, InclinationRange) {
+    satellite.updateFromTLE(ISS_TLE);
+    double incl = satellite.getInclination();
     EXPECT_GE(incl, 0.0);
     EXPECT_LE(incl, 180.0);
 }
 
-TEST_F(OrbitTest, EccentricityRange) {
-    orbit.updateFromTLE(ISS_TLE);
-    double ecc = orbit.getEccentricity();
+TEST_F(SatelliteTest, EccentricityRange) {
+    satellite.updateFromTLE(ISS_TLE);
+    double ecc = satellite.getEccentricity();
     EXPECT_GE(ecc, 0.0);
     EXPECT_LT(ecc, 1.0);  // Must be less than 1 for elliptical orbit
 }
 
-TEST_F(OrbitTest, RAANRange) {
-    orbit.updateFromTLE(ISS_TLE);
-    double raan = orbit.getRightAscensionOfAscendingNode();
+TEST_F(SatelliteTest, RAANRange) {
+    satellite.updateFromTLE(ISS_TLE);
+    double raan = satellite.getRightAscensionOfAscendingNode();
     EXPECT_GE(raan, 0.0);
     EXPECT_LT(raan, 360.0);
 }
 
-TEST_F(OrbitTest, ArgumentOfPerigeeRange) {
-    orbit.updateFromTLE(ISS_TLE);
-    double aop = orbit.getArgumentOfPerigee();
+TEST_F(SatelliteTest, ArgumentOfPerigeeRange) {
+    satellite.updateFromTLE(ISS_TLE);
+    double aop = satellite.getArgumentOfPerigee();
     EXPECT_GE(aop, 0.0);
     EXPECT_LT(aop, 360.0);
 }
 
-TEST_F(OrbitTest, MeanAnomalyRange) {
-    orbit.updateFromTLE(ISS_TLE);
-    double ma = orbit.getMeanAnomaly();
+TEST_F(SatelliteTest, MeanAnomalyRange) {
+    satellite.updateFromTLE(ISS_TLE);
+    double ma = satellite.getMeanAnomaly();
     EXPECT_GE(ma, 0.0);
     EXPECT_LT(ma, 360.0);
 }
 
-TEST_F(OrbitTest, MeanMotionPositive) {
-    orbit.updateFromTLE(ISS_TLE);
-    EXPECT_GT(orbit.getMeanMotion(), 0.0);
+TEST_F(SatelliteTest, MeanMotionPositive) {
+    satellite.updateFromTLE(ISS_TLE);
+    EXPECT_GT(satellite.getMeanMotion(), 0.0);
 }
 
 // Test physical interpretation of orbital elements
-TEST_F(OrbitTest, ISSIsLowEarthOrbit) {
-    orbit.updateFromTLE(ISS_TLE);
+TEST_F(SatelliteTest, ISSIsLowEarthOrbit) {
+    satellite.updateFromTLE(ISS_TLE);
     // ISS has mean motion ~15.5 rev/day, indicating LEO
     // LEO satellites typically have mean motion > 11 rev/day
-    EXPECT_GT(orbit.getMeanMotion(), 11.0);
+    EXPECT_GT(satellite.getMeanMotion(), 11.0);
 }
 
-TEST_F(OrbitTest, ISSHasLowEccentricity) {
-    orbit.updateFromTLE(ISS_TLE);
+TEST_F(SatelliteTest, ISSHasLowEccentricity) {
+    satellite.updateFromTLE(ISS_TLE);
     // ISS has nearly circular orbit
-    EXPECT_LT(orbit.getEccentricity(), 0.01);
+    EXPECT_LT(satellite.getEccentricity(), 0.01);
 }
 
-TEST_F(OrbitTest, NOAA19IsSunSynchronous) {
-    orbit.updateFromTLE(NOAA19_TLE);
+TEST_F(SatelliteTest, NOAA19IsSunSynchronous) {
+    satellite.updateFromTLE(NOAA19_TLE);
     // Sun-synchronous orbits have inclination ~98-99 degrees
-    double incl = orbit.getInclination();
+    double incl = satellite.getInclination();
     EXPECT_GT(incl, 97.0);
     EXPECT_LT(incl, 100.0);
 }
@@ -477,27 +477,27 @@ TEST(ECEFToGeodeticTest, ISSAltitude) {
 // SGP4 Propagation Tests
 // ============================================================================
 
-TEST_F(OrbitTest, SGP4InitializesSuccessfully) {
-    orbit.updateFromTLE(ISS_TLE);
-    double epochJD = toJulianDate(orbit.getEpoch());
+TEST_F(SatelliteTest, SGP4InitializesSuccessfully) {
+    satellite.updateFromTLE(ISS_TLE);
+    double epochJD = toJulianDate(satellite.getEpoch());
     // Should not throw - SGP4 initializes on first getECI call
-    EXPECT_NO_THROW(orbit.getECI(epochJD));
+    EXPECT_NO_THROW(satellite.getECI(epochJD));
 }
 
-TEST_F(OrbitTest, SGP4PropagationReturnsValidPosition) {
-    orbit.updateFromTLE(ISS_TLE);
-    double epochJD = toJulianDate(orbit.getEpoch());
-    Vec3 eci = orbit.getECI(epochJD);
+TEST_F(SatelliteTest, SGP4PropagationReturnsValidPosition) {
+    satellite.updateFromTLE(ISS_TLE);
+    double epochJD = toJulianDate(satellite.getEpoch());
+    Vec3 eci = satellite.getECI(epochJD);
     double r = eci.magnitude();
     // ISS should be at reasonable altitude (~420 km above Earth)
     EXPECT_GT(r, 6700.0);  // Earth radius + ~320 km
     EXPECT_LT(r, 6900.0);  // Earth radius + ~520 km
 }
 
-TEST_F(OrbitTest, SGP4VelocityReturnsValidSpeed) {
-    orbit.updateFromTLE(ISS_TLE);
-    double epochJD = toJulianDate(orbit.getEpoch());
-    Vec3 vel = orbit.getVelocity(epochJD);
+TEST_F(SatelliteTest, SGP4VelocityReturnsValidSpeed) {
+    satellite.updateFromTLE(ISS_TLE);
+    double epochJD = toJulianDate(satellite.getEpoch());
+    Vec3 vel = satellite.getVelocity(epochJD);
     double speed = vel.magnitude();
     // ISS orbital velocity is ~7.66 km/s
     EXPECT_GT(speed, 7.0);
@@ -508,10 +508,10 @@ TEST_F(OrbitTest, SGP4VelocityReturnsValidSpeed) {
 // ECI Position Tests
 // ============================================================================
 
-TEST_F(OrbitTest, ECIReturnsReasonableAltitude) {
-    orbit.updateFromTLE(ISS_TLE);
-    double epochJD = toJulianDate(orbit.getEpoch());
-    Vec3 eci = orbit.getECI(epochJD);
+TEST_F(SatelliteTest, ECIReturnsReasonableAltitude) {
+    satellite.updateFromTLE(ISS_TLE);
+    double epochJD = toJulianDate(satellite.getEpoch());
+    Vec3 eci = satellite.getECI(epochJD);
     double r = eci.magnitude();
     // ISS altitude is ~420 km, Earth radius ~6378 km
     // So distance from Earth center should be ~6798 km
@@ -519,12 +519,12 @@ TEST_F(OrbitTest, ECIReturnsReasonableAltitude) {
     EXPECT_LT(r, 6900.0);
 }
 
-TEST_F(OrbitTest, ECIOrbitIsNearlyCircular) {
-    orbit.updateFromTLE(ISS_TLE);
-    double epochJD = toJulianDate(orbit.getEpoch());
+TEST_F(SatelliteTest, ECIOrbitIsNearlyCircular) {
+    satellite.updateFromTLE(ISS_TLE);
+    double epochJD = toJulianDate(satellite.getEpoch());
     // Check radius at two points half an orbit apart (~46 minutes)
-    Vec3 eci1 = orbit.getECI(epochJD);
-    Vec3 eci2 = orbit.getECI(epochJD + 46.0/1440.0);  // 46 minutes later
+    Vec3 eci1 = satellite.getECI(epochJD);
+    Vec3 eci2 = satellite.getECI(epochJD + 46.0/1440.0);  // 46 minutes later
     double r1 = eci1.magnitude();
     double r2 = eci2.magnitude();
     // For ISS with e ≈ 0.0003723, the difference should be small
@@ -532,11 +532,11 @@ TEST_F(OrbitTest, ECIOrbitIsNearlyCircular) {
     EXPECT_LT(diff, 10.0);  // Less than 10 km difference
 }
 
-TEST_F(OrbitTest, ECIInclinationConsistent) {
-    orbit.updateFromTLE(ISS_TLE);
-    double epochJD = toJulianDate(orbit.getEpoch());
+TEST_F(SatelliteTest, ECIInclinationConsistent) {
+    satellite.updateFromTLE(ISS_TLE);
+    double epochJD = toJulianDate(satellite.getEpoch());
     // At some point during orbit, the z-component will reflect inclination
-    Vec3 eci = orbit.getECI(epochJD + 23.0/1440.0);  // ~quarter orbit
+    Vec3 eci = satellite.getECI(epochJD + 23.0/1440.0);  // ~quarter orbit
     double r = eci.magnitude();
     // The maximum |z/r| should be approximately sin(inclination)
     double zOverR = std::abs(eci.z / r);
@@ -549,26 +549,26 @@ TEST_F(OrbitTest, ECIInclinationConsistent) {
 // printInfo Tests
 // ============================================================================
 
-TEST_F(OrbitTest, PrintInfo_ContainsSatelliteName) {
-    orbit.updateFromTLE(TLE_WITH_NAME);
+TEST_F(SatelliteTest, PrintInfo_ContainsSatelliteName) {
+    satellite.updateFromTLE(TLE_WITH_NAME);
     std::ostringstream oss;
-    orbit.printInfo(oss);
+    satellite.printInfo(oss);
     std::string output = oss.str();
     EXPECT_NE(output.find("ISS (ZARYA)"), std::string::npos);
 }
 
-TEST_F(OrbitTest, PrintInfo_ContainsNoradID) {
-    orbit.updateFromTLE(ISS_TLE);
+TEST_F(SatelliteTest, PrintInfo_ContainsNoradID) {
+    satellite.updateFromTLE(ISS_TLE);
     std::ostringstream oss;
-    orbit.printInfo(oss);
+    satellite.printInfo(oss);
     std::string output = oss.str();
     EXPECT_NE(output.find("NORAD ID: 25544"), std::string::npos);
 }
 
-TEST_F(OrbitTest, PrintInfo_ContainsOrbitalElements) {
-    orbit.updateFromTLE(ISS_TLE);
+TEST_F(SatelliteTest, PrintInfo_ContainsOrbitalElements) {
+    satellite.updateFromTLE(ISS_TLE);
     std::ostringstream oss;
-    orbit.printInfo(oss);
+    satellite.printInfo(oss);
     std::string output = oss.str();
 
     // Check for key orbital element labels
@@ -580,10 +580,10 @@ TEST_F(OrbitTest, PrintInfo_ContainsOrbitalElements) {
     EXPECT_NE(output.find("Right Ascension of Ascending Node:"), std::string::npos);
 }
 
-TEST_F(OrbitTest, PrintInfo_ContainsEpoch) {
-    orbit.updateFromTLE(ISS_TLE);
+TEST_F(SatelliteTest, PrintInfo_ContainsEpoch) {
+    satellite.updateFromTLE(ISS_TLE);
     std::ostringstream oss;
-    orbit.printInfo(oss);
+    satellite.printInfo(oss);
     std::string output = oss.str();
 
     // Check that epoch is present and contains UTC
@@ -591,10 +591,10 @@ TEST_F(OrbitTest, PrintInfo_ContainsEpoch) {
     EXPECT_NE(output.find("UTC"), std::string::npos);
 }
 
-TEST_F(OrbitTest, PrintInfo_ContainsDragTerms) {
-    orbit.updateFromTLE(ISS_TLE);
+TEST_F(SatelliteTest, PrintInfo_ContainsDragTerms) {
+    satellite.updateFromTLE(ISS_TLE);
     std::ostringstream oss;
-    orbit.printInfo(oss);
+    satellite.printInfo(oss);
     std::string output = oss.str();
 
     EXPECT_NE(output.find("First Derivative of Mean Motion:"), std::string::npos);
@@ -602,10 +602,10 @@ TEST_F(OrbitTest, PrintInfo_ContainsDragTerms) {
     EXPECT_NE(output.find("Bstar Drag Term:"), std::string::npos);
 }
 
-TEST_F(OrbitTest, PrintInfo_OutputIsNotEmpty) {
-    orbit.updateFromTLE(ISS_TLE);
+TEST_F(SatelliteTest, PrintInfo_OutputIsNotEmpty) {
+    satellite.updateFromTLE(ISS_TLE);
     std::ostringstream oss;
-    orbit.printInfo(oss);
+    satellite.printInfo(oss);
     EXPECT_FALSE(oss.str().empty());
 }
 
@@ -620,7 +620,7 @@ TEST(LoadTLEDatabaseTest, LoadSingleSatellite) {
         "2 25544  51.6312 206.3646 0003723 184.1118 175.9840 15.49193835540850\n"
     );
 
-    std::map<int, Orbit> database;
+    std::map<int, Satellite> database;
     loadTLEDatabase(input, database);
 
     EXPECT_EQ(database.size(), 1);
@@ -639,7 +639,7 @@ TEST(LoadTLEDatabaseTest, LoadMultipleSatellites) {
         "2 33591  98.9785  39.2910 0013037 231.6546 128.3455 14.13431889866318\n"
     );
 
-    std::map<int, Orbit> database;
+    std::map<int, Satellite> database;
     loadTLEDatabase(input, database);
 
     EXPECT_EQ(database.size(), 2);
@@ -652,7 +652,7 @@ TEST(LoadTLEDatabaseTest, LoadMultipleSatellites) {
 TEST(LoadTLEDatabaseTest, LoadEmptyStream) {
     std::istringstream input("");
 
-    std::map<int, Orbit> database;
+    std::map<int, Satellite> database;
     loadTLEDatabase(input, database);
 
     EXPECT_TRUE(database.empty());
@@ -669,7 +669,7 @@ TEST(LoadTLEDatabaseTest, LoadWithBlankLines) {
         "\n"
     );
 
-    std::map<int, Orbit> database;
+    std::map<int, Satellite> database;
     loadTLEDatabase(input, database);
 
     EXPECT_EQ(database.size(), 1);
@@ -683,10 +683,10 @@ TEST(LoadTLEDatabaseTest, PreservesOrbitalElements) {
         "2 25544  51.6312 206.3646 0003723 184.1118 175.9840 15.49193835540850\n"
     );
 
-    std::map<int, Orbit> database;
+    std::map<int, Satellite> database;
     loadTLEDatabase(input, database);
 
-    const Orbit& iss = database[25544];
+    const Satellite& iss = database[25544];
     EXPECT_DOUBLE_EQ(iss.getInclination(), 51.6312);
     EXPECT_DOUBLE_EQ(iss.getRightAscensionOfAscendingNode(), 206.3646);
     EXPECT_NEAR(iss.getEccentricity(), 0.0003723, 1e-8);
@@ -694,7 +694,7 @@ TEST(LoadTLEDatabaseTest, PreservesOrbitalElements) {
 }
 
 TEST(LoadTLEDatabaseTest, AppendsToExistingDatabase) {
-    std::map<int, Orbit> database;
+    std::map<int, Satellite> database;
 
     // Load first satellite
     std::istringstream input1(
@@ -719,7 +719,7 @@ TEST(LoadTLEDatabaseTest, AppendsToExistingDatabase) {
 }
 
 TEST(LoadTLEDatabaseTest, UpdatesExistingEntry) {
-    std::map<int, Orbit> database;
+    std::map<int, Satellite> database;
 
     // Load ISS with one epoch
     std::istringstream input1(
@@ -748,7 +748,7 @@ TEST(LoadTLEDatabaseTest, TwoLineFormatWithoutName) {
         "2 25544  51.6312 206.3646 0003723 184.1118 175.9840 15.49193835540850\n"
     );
 
-    std::map<int, Orbit> database;
+    std::map<int, Satellite> database;
     loadTLEDatabase(input, database);
 
     EXPECT_EQ(database.size(), 1);
@@ -767,7 +767,7 @@ TEST(LoadTLEDatabaseTest, LookupByNoradID) {
         "2 33591  98.9785  39.2910 0013037 231.6546 128.3455 14.13431889866318\n"
     );
 
-    std::map<int, Orbit> database;
+    std::map<int, Satellite> database;
     loadTLEDatabase(input, database);
 
     // Test lookup of existing IDs
@@ -782,43 +782,43 @@ TEST(LoadTLEDatabaseTest, LookupByNoradID) {
 // getTLE Round-Trip Tests
 // ============================================================================
 
-TEST_F(OrbitTest, GetTLE_RoundTrip_ISS) {
+TEST_F(SatelliteTest, GetTLE_RoundTrip_ISS) {
     // Known good 3-line TLE for ISS
     const std::string originalTLE =
         "ISS (ZARYA)\n"
         "1 25544U 98067A   25333.83453771  .00008010  00000+0  15237-3 0  9993\n"
         "2 25544  51.6312 206.3646 0003723 184.1118 175.9840 15.49193835540850\n";
 
-    orbit.updateFromTLE(originalTLE);
-    std::string regeneratedTLE = orbit.getTLE();
+    satellite.updateFromTLE(originalTLE);
+    std::string regeneratedTLE = satellite.getTLE();
 
     EXPECT_EQ(originalTLE, regeneratedTLE);
 }
 
-TEST_F(OrbitTest, GetTLE_RoundTrip_NOAA19) {
+TEST_F(SatelliteTest, GetTLE_RoundTrip_NOAA19) {
     // Known good 3-line TLE for NOAA 19
     const std::string originalTLE =
         "NOAA 19\n"
         "1 33591U 09005A   25333.78204194  .00000054  00000+0  52635-4 0  9999\n"
         "2 33591  98.9785  39.2910 0013037 231.6546 128.3455 14.13431889866318\n";
 
-    orbit.updateFromTLE(originalTLE);
-    std::string regeneratedTLE = orbit.getTLE();
+    satellite.updateFromTLE(originalTLE);
+    std::string regeneratedTLE = satellite.getTLE();
 
     EXPECT_EQ(originalTLE, regeneratedTLE);
 }
 
-TEST_F(OrbitTest, GetTLE_ContainsName) {
-    orbit.updateFromTLE(TLE_WITH_NAME);
-    std::string tle = orbit.getTLE();
+TEST_F(SatelliteTest, GetTLE_ContainsName) {
+    satellite.updateFromTLE(TLE_WITH_NAME);
+    std::string tle = satellite.getTLE();
 
     // First line should be the satellite name
     EXPECT_TRUE(tle.starts_with("ISS (ZARYA)\n"));
 }
 
-TEST_F(OrbitTest, GetTLE_Line1StartsCorrectly) {
-    orbit.updateFromTLE(TLE_WITH_NAME);
-    std::string tle = orbit.getTLE();
+TEST_F(SatelliteTest, GetTLE_Line1StartsCorrectly) {
+    satellite.updateFromTLE(TLE_WITH_NAME);
+    std::string tle = satellite.getTLE();
 
     // Find the second line (line 1 of TLE)
     auto firstNewline = tle.find('\n');
@@ -826,9 +826,9 @@ TEST_F(OrbitTest, GetTLE_Line1StartsCorrectly) {
     EXPECT_EQ(line1Start, "1 ");
 }
 
-TEST_F(OrbitTest, GetTLE_Line2StartsCorrectly) {
-    orbit.updateFromTLE(TLE_WITH_NAME);
-    std::string tle = orbit.getTLE();
+TEST_F(SatelliteTest, GetTLE_Line2StartsCorrectly) {
+    satellite.updateFromTLE(TLE_WITH_NAME);
+    std::string tle = satellite.getTLE();
 
     // Find line 2 of TLE
     auto firstNewline = tle.find('\n');
@@ -837,43 +837,43 @@ TEST_F(OrbitTest, GetTLE_Line2StartsCorrectly) {
     EXPECT_EQ(line2Start, "2 ");
 }
 
-TEST_F(OrbitTest, GetTLE_ContainsNoradID) {
-    orbit.updateFromTLE(TLE_WITH_NAME);
-    std::string tle = orbit.getTLE();
+TEST_F(SatelliteTest, GetTLE_ContainsNoradID) {
+    satellite.updateFromTLE(TLE_WITH_NAME);
+    std::string tle = satellite.getTLE();
 
     // NORAD ID 25544 should appear in line 1 and line 2
     EXPECT_NE(tle.find("25544"), std::string::npos);
 }
 
-TEST_F(OrbitTest, GetTLE_ReloadProducesSameOrbit) {
+TEST_F(SatelliteTest, GetTLE_ReloadProducesSameOrbit) {
     // Load original TLE
-    orbit.updateFromTLE(TLE_WITH_NAME);
+    satellite.updateFromTLE(TLE_WITH_NAME);
 
     // Get regenerated TLE
-    std::string regeneratedTLE = orbit.getTLE();
+    std::string regeneratedTLE = satellite.getTLE();
 
-    // Load regenerated TLE into a new Orbit
-    Orbit orbit2;
-    orbit2.updateFromTLE(regeneratedTLE);
+    // Load regenerated TLE into a new Satellite
+    Satellite satellite2;
+    satellite2.updateFromTLE(regeneratedTLE);
 
     // Compare all orbital elements
-    EXPECT_EQ(orbit.getNoradID(), orbit2.getNoradID());
-    EXPECT_EQ(orbit.getName(), orbit2.getName());
-    EXPECT_EQ(orbit.getClassification(), orbit2.getClassification());
-    EXPECT_EQ(orbit.getDesignator(), orbit2.getDesignator());
-    EXPECT_DOUBLE_EQ(orbit.getInclination(), orbit2.getInclination());
-    EXPECT_DOUBLE_EQ(orbit.getRightAscensionOfAscendingNode(), orbit2.getRightAscensionOfAscendingNode());
-    EXPECT_DOUBLE_EQ(orbit.getEccentricity(), orbit2.getEccentricity());
-    EXPECT_DOUBLE_EQ(orbit.getArgumentOfPerigee(), orbit2.getArgumentOfPerigee());
-    EXPECT_DOUBLE_EQ(orbit.getMeanAnomaly(), orbit2.getMeanAnomaly());
-    EXPECT_DOUBLE_EQ(orbit.getMeanMotion(), orbit2.getMeanMotion());
-    EXPECT_EQ(orbit.getRevolutionNumberAtEpoch(), orbit2.getRevolutionNumberAtEpoch());
+    EXPECT_EQ(satellite.getNoradID(), satellite2.getNoradID());
+    EXPECT_EQ(satellite.getName(), satellite2.getName());
+    EXPECT_EQ(satellite.getClassification(), satellite2.getClassification());
+    EXPECT_EQ(satellite.getDesignator(), satellite2.getDesignator());
+    EXPECT_DOUBLE_EQ(satellite.getInclination(), satellite2.getInclination());
+    EXPECT_DOUBLE_EQ(satellite.getRightAscensionOfAscendingNode(), satellite2.getRightAscensionOfAscendingNode());
+    EXPECT_DOUBLE_EQ(satellite.getEccentricity(), satellite2.getEccentricity());
+    EXPECT_DOUBLE_EQ(satellite.getArgumentOfPerigee(), satellite2.getArgumentOfPerigee());
+    EXPECT_DOUBLE_EQ(satellite.getMeanAnomaly(), satellite2.getMeanAnomaly());
+    EXPECT_DOUBLE_EQ(satellite.getMeanMotion(), satellite2.getMeanMotion());
+    EXPECT_EQ(satellite.getRevolutionNumberAtEpoch(), satellite2.getRevolutionNumberAtEpoch());
 }
 
-TEST_F(OrbitTest, GetTLE_TwoLineFormat) {
+TEST_F(SatelliteTest, GetTLE_TwoLineFormat) {
     // Test with 2-line format (no name)
-    orbit.updateFromTLE(ISS_TLE);
-    std::string tle = orbit.getTLE();
+    satellite.updateFromTLE(ISS_TLE);
+    std::string tle = satellite.getTLE();
 
     // Should still produce valid output (with empty name line)
     EXPECT_TRUE(tle.find("1 ") != std::string::npos);
@@ -1372,17 +1372,17 @@ TEST(GetLookAnglesTest, ElevationInValidRange) {
 }
 
 // ============================================================================
-// getLookAngles with Orbit Tests
+// getLookAngles with Satellite Tests
 // ============================================================================
 
-TEST_F(OrbitTest, GetLookAnglesAtEpoch) {
-    orbit.updateFromTLE(ISS_TLE);
+TEST_F(SatelliteTest, GetLookAnglesAtEpoch) {
+    satellite.updateFromTLE(ISS_TLE);
 
     // Observer at a mid-latitude location
     Geodetic observer{0.7, -1.5, 0.0};  // ~40°N, ~86°W
 
-    double epochJD = toJulianDate(orbit.getEpoch());
-    LookAngles angles = getLookAngles(orbit, observer, epochJD);
+    double epochJD = toJulianDate(satellite.getEpoch());
+    LookAngles angles = getLookAngles(satellite, observer, epochJD);
 
     // Just verify we get reasonable values
     EXPECT_GE(angles.azimuthInRadians, 0.0);
@@ -1393,14 +1393,14 @@ TEST_F(OrbitTest, GetLookAnglesAtEpoch) {
     EXPECT_LT(angles.rangeInKilometers, 50000.0);  // Should be less than GEO distance
 }
 
-TEST_F(OrbitTest, GetLookAnglesRangeReasonable) {
-    orbit.updateFromTLE(ISS_TLE);
+TEST_F(SatelliteTest, GetLookAnglesRangeReasonable) {
+    satellite.updateFromTLE(ISS_TLE);
 
     // Observer location doesn't matter much for range check
     Geodetic observer{0.0, 0.0, 0.0};
 
-    double epochJD = toJulianDate(orbit.getEpoch());
-    LookAngles angles = getLookAngles(orbit, observer, epochJD);
+    double epochJD = toJulianDate(satellite.getEpoch());
+    LookAngles angles = getLookAngles(satellite, observer, epochJD);
 
     // ISS at ~420 km altitude
     // Minimum range (directly overhead): ~420 km
@@ -1450,23 +1450,23 @@ TEST(IsVisibleTest, HighElevation) {
 }
 
 // ============================================================================
-// isVisible with Orbit Tests
+// isVisible with Satellite Tests
 // ============================================================================
 
-TEST_F(OrbitTest, IsVisibleReturnsReasonableResults) {
-    orbit.updateFromTLE(ISS_TLE);
+TEST_F(SatelliteTest, IsVisibleReturnsReasonableResults) {
+    satellite.updateFromTLE(ISS_TLE);
 
     // Observer at a specific location
     Geodetic observer{0.7, -1.5, 0.0};
 
-    double epochJD = toJulianDate(orbit.getEpoch());
+    double epochJD = toJulianDate(satellite.getEpoch());
 
     // Check visibility with different thresholds
     // These should return consistent results (visible at low threshold means
     // visible at even lower threshold)
-    bool visibleAt0 = isVisible(orbit, observer, epochJD, 0.0);
-    bool visibleAt10deg = isVisible(orbit, observer, epochJD, 10.0 * M_PI / 180.0);
-    bool visibleAt45deg = isVisible(orbit, observer, epochJD, 45.0 * M_PI / 180.0);
+    bool visibleAt0 = isVisible(satellite, observer, epochJD, 0.0);
+    bool visibleAt10deg = isVisible(satellite, observer, epochJD, 10.0 * M_PI / 180.0);
+    bool visibleAt45deg = isVisible(satellite, observer, epochJD, 45.0 * M_PI / 180.0);
 
     // If visible at high threshold, must be visible at lower threshold
     if (visibleAt45deg) {
@@ -1482,22 +1482,22 @@ TEST_F(OrbitTest, IsVisibleReturnsReasonableResults) {
 // findNextPass Tests
 // ============================================================================
 
-TEST_F(OrbitTest, FindNextPassReturnsValidPassForISS) {
+TEST_F(SatelliteTest, FindNextPassReturnsValidPassForISS) {
     // ISS should have passes over mid-latitude locations
-    orbit.updateFromTLE(ISS_TLE);
+    satellite.updateFromTLE(ISS_TLE);
     Geodetic observer{0.7, -1.5, 0.0};  // ~40°N, ~86°W
 
-    auto pass = findNextPass(orbit, observer, 0.0, orbit.getEpoch());
+    auto pass = findNextPass(satellite, observer, 0.0, satellite.getEpoch());
 
     // Should find a pass within 48 hours for ISS
     EXPECT_TRUE(pass.has_value());
 }
 
-TEST_F(OrbitTest, FindNextPassReturnsValidPass) {
-    orbit.updateFromTLE(ISS_TLE);
+TEST_F(SatelliteTest, FindNextPassReturnsValidPass) {
+    satellite.updateFromTLE(ISS_TLE);
     Geodetic observer{0.7, -1.5, 0.0};  // ~40°N, ~86°W
 
-    auto pass = findNextPass(orbit, observer, 0.0, orbit.getEpoch());
+    auto pass = findNextPass(satellite, observer, 0.0, satellite.getEpoch());
 
     ASSERT_TRUE(pass.has_value());
     // Rise time should be before max elevation time
@@ -1509,12 +1509,12 @@ TEST_F(OrbitTest, FindNextPassReturnsValidPass) {
     EXPECT_GE(pass->maxAngles.elevationInRadians, pass->setAngles.elevationInRadians);
 }
 
-TEST_F(OrbitTest, FindNextPassWithMinElevation) {
-    orbit.updateFromTLE(ISS_TLE);
+TEST_F(SatelliteTest, FindNextPassWithMinElevation) {
+    satellite.updateFromTLE(ISS_TLE);
     Geodetic observer{0.7, -1.5, 0.0};
     double minElevation = 10.0 * M_PI / 180.0;  // 10 degrees
 
-    auto pass = findNextPass(orbit, observer, minElevation, orbit.getEpoch());
+    auto pass = findNextPass(satellite, observer, minElevation, satellite.getEpoch());
 
     if (pass.has_value()) {
         // Rise elevation should be at or above minimum
@@ -1524,13 +1524,13 @@ TEST_F(OrbitTest, FindNextPassWithMinElevation) {
     }
 }
 
-TEST_F(OrbitTest, FindNextPassISSHasMultipleDailyPasses) {
+TEST_F(SatelliteTest, FindNextPassISSHasMultipleDailyPasses) {
     // ISS completes about 15.5 orbits per day, so there should be multiple
     // opportunities for passes over any given location
-    orbit.updateFromTLE(ISS_TLE);
+    satellite.updateFromTLE(ISS_TLE);
     Geodetic observer{0.7, -1.5, 0.0};
 
-    auto now = orbit.getEpoch();
+    auto now = satellite.getEpoch();
     int passCount = 0;
 
     // Search for passes over 24 hours
@@ -1538,7 +1538,7 @@ TEST_F(OrbitTest, FindNextPassISSHasMultipleDailyPasses) {
     auto endTime = now + std::chrono::hours(24);
 
     while (searchTime < endTime) {
-        auto pass = findNextPass(orbit, observer, 0.0, searchTime);
+        auto pass = findNextPass(satellite, observer, 0.0, searchTime);
         if (pass.has_value()) {
             passCount++;
             // Move search time past this pass
