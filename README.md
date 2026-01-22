@@ -17,7 +17,7 @@ It has the following features:
 Install dependencies:
 
 ```sh
-sudo apt install build-essential cmake libcurl4-openssl-dev libcurlpp-dev rapidjson-dev libcli11-dev libgtest-dev
+sudo apt install build-essential cmake libcurl4-openssl-dev libcurlpp-dev rapidjson-dev libcli11-dev libspdlog-dev libfmt-dev libgtest-dev
 ```
 
 Build the application:
@@ -42,11 +42,9 @@ Although I wrote the initial [Keplerian](https://en.wikipedia.org/wiki/Kepler_or
 
 SatTrack uses [CelesTrak](https://celestrak.org/) as its primary source for TLE data. CelesTrak is a non-profit service that provides satellite information for free. If you feel so inclined, they take donations to help cover their costs.
 
-In addition, SatTrack can get both TLE and pass data from [N2YO](https://www.n2yo.com). If you want to use the N2YO APIs you will need an API key, which you can get by signing up for a free account at N2YO.
-
 ## Configuration
 
-All configuration options can be provided on the command line, but you can also create a config file to store common options, like your N2YO API key and the list of satellites you care about. The config file is stored in TOML format and the options available are the same as the command line options. The config file is located at `~/.sattrack.toml` by default, but you can also supply a path to the config file using the `--config` command line option.
+All configuration options can be provided on the command line, but you can also create a config file to store common options, like the list of satellites you care about. The config file is stored in TOML format and the options available are the same as the command line options. The config file is located at `~/.sattrack.toml` by default, but you can also supply a path to the config file using the `--config` command line option.
 
 Here is an example config file:
 
@@ -58,10 +56,6 @@ alt = 30
 
 info.id = 25544
 tle.id = 25544
-
-# N2YO Settings
-n2yo.key = 'YOUR-API-KEY-HERE'
-n2yo.passes.id = [25544,36122,28895,27848,27844,32785,22825,7530,25397,24278]
 ```
 
 ## Usage
@@ -193,48 +187,6 @@ sattrack --lat 35.58 --long 139.48 passes 25544 --days 2 --elev 20
 sattrack --lat 35.58 --long 139.48 passes 25544 --horizon 10  # useful for antenna tracking
 ```
 
-#### `n2yo` - N2YO API commands
-
-Commands that fetch data from the N2YO API. These require an API key.
-
-##### `n2yo passes` - Display future passes
-
-Shows upcoming passes for satellites, sorted by start time.
-
-Options:
-
-- `--key <key>` - N2YO API key
-- `--days <n>` - Number of days worth of passes to display (default 1, max 10)
-- `--elev <n>` - Filters out passes whose maximum elevation is below this value, in degrees (default 10)
-
-```sh
-sattrack n2yo passes --key YOUR-API-KEY 25544
-```
-
-##### `n2yo tle` - Display raw TLE data
-
-Fetches and displays Two-Line Element sets from N2YO.
-
-```sh
-sattrack n2yo tle --key YOUR-API-KEY 25544
-```
-
-##### `n2yo info` - Display orbital elements
-
-Fetches TLE from N2YO and displays parsed orbital elements.
-
-```sh
-sattrack n2yo info --key YOUR-API-KEY 25544
-```
-
-##### `n2yo update` - Update local TLE from N2YO
-
-Downloads TLE data from N2YO and stores it in the local database.
-
-```sh
-sattrack n2yo update --key YOUR-API-KEY 25544 28895
-```
-
 ### Global Options
 
 - `--config <path>` - Path to configuration file (default: ~/.sattrack.toml)
@@ -253,7 +205,9 @@ SatTrack depends on these libraries:
 2. [RapidJSON](https://rapidjson.org) is used to parse JSON.
 3. [curlpp](https://github.com/jpbarrette/curlpp) wraps [libcurl](https://curl.se/libcurl/) in a C++ interface for making HTTPS requests.
 4. [CLI11](https://github.com/CLIUtils/CLI11) for command-line argument parsing.
-5. [Google Test](https://github.com/google/googletest) for unit testing (only needed for running tests).
+5. [spdlog](https://github.com/gabime/spdlog) for fast, header-only logging.
+6. [fmt](https://github.com/fmtlib/fmt) for modern C++ string formatting (required by spdlog).
+7. [Google Test](https://github.com/google/googletest) for unit testing (only needed for running tests).
 
 SatTrack also depends on Howard Hinnant's [date library](https://howardhinnant.github.io/date/date.html) to support C++20 date/time functions that are not yet well supported by most compilers.
 

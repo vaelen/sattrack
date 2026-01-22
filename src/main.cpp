@@ -69,33 +69,6 @@ std::chrono::system_clock::time_point toTimePoint(const long timestamp) {
     );
 }
 
-sattrack::PassInfo convertN2YOPassToPassInfo(
-    const n2yo::RadioPass &n2yoPass,
-    const n2yo::SatelliteInfo &satInfo) {
-
-    using namespace sattrack;
-    using namespace std::chrono;
-
-    PassInfo passInfo;
-
-    passInfo.noradID = satInfo.id;
-    passInfo.name = satInfo.name;
-    passInfo.riseTime = toTimePoint(n2yoPass.startUTC);
-    passInfo.setTime = toTimePoint(n2yoPass.endUTC);
-    passInfo.maxElevationTime = toTimePoint(n2yoPass.maxUTC);
-    passInfo.riseAngles.azimuthInRadians = n2yoPass.startAz * DEGREES_TO_RADIANS;
-    passInfo.riseAngles.elevationInRadians = 0.0;  // N2YO does not provide elevation at rise
-    passInfo.riseAngles.rangeInKilometers = 0.0;  // N2YO does not provide range at rise
-    passInfo.maxAngles.azimuthInRadians = n2yoPass.maxAz * DEGREES_TO_RADIANS;
-    passInfo.maxAngles.elevationInRadians = n2yoPass.maxEl * DEGREES_TO_RADIANS;
-    passInfo.maxAngles.rangeInKilometers = 0.0;  // N2YO does not provide range at max elevation
-    passInfo.setAngles.azimuthInRadians = n2yoPass.endAz * DEGREES_TO_RADIANS;
-    passInfo.setAngles.elevationInRadians = 0.0;  // N2YO does not provide elevation at set
-    passInfo.setAngles.rangeInKilometers = 0.0;  // N2YO does not provide range at set
-
-    return passInfo;
-}
-
 void printPasses(std::vector<sattrack::PassInfo> passes) {
     using namespace sattrack;
     using namespace std::chrono;
@@ -179,6 +152,8 @@ int main(int argc, char* argv[]) {
     CLI::App app{"SatTrack"};
     argv = app.ensure_utf8(argv);
 
+    ///// Global options /////
+
     app.set_config("--config", configFile, "Read configuration from this file (default: " + configFile + ").");
 
     app.add_option_function<double>("--lat", 
@@ -196,230 +171,12 @@ int main(int argc, char* argv[]) {
     
     app.ignore_case();
 
-    // n2yo command - access N2YO APIs
-    auto n2yoCommand = app.add_subcommand("n2yo", "Get satellite info from N2YO");
-    n2yoCommand->add_option_function<std::string>("--key",
-        [&config](const std::string &key) { config.setAPIKey(key); },
-        "N2YO API key");
-
-    std::vector<int> n2yoIDs;
-
-    auto n2yoTleCommand = n2yoCommand->add_subcommand("tle", "Display raw TLE data from N2YO");
-    n2yoTleCommand->add_option_function<std::string>("--key",
-        [&config](const std::string &key) { config.setAPIKey(key); },
-        "N2YO API key");
-    n2yoTleCommand->add_option("id", n2yoIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
-    
-    auto n2yoInfoCommand = n2yoCommand->add_subcommand("info", "Display a satellite's orbital elements");
-    n2yoInfoCommand->add_option_function<std::string>("--key",
-        [&config](const std::string &key) { config.setAPIKey(key); },
-        "N2YO API key");
-    n2yoInfoCommand->add_option("id", n2yoIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
-
-    auto n2yoUpdateCommand = n2yoCommand->add_subcommand("update", "Update local TLE data from N2YO");
-    n2yoUpdateCommand->add_option_function<std::string>("--key",
-        [&config](const std::string &key) { config.setAPIKey(key); },
-        "N2YO API key");
-    n2yoUpdateCommand->add_option("id", n2yoIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
-
-    auto n2yoPassesCommand = n2yoCommand->add_subcommand("passes", "Display future passes");
-    n2yoPassesCommand->add_option_function<std::string>("--key",
-        [&config](const std::string &key) { config.setAPIKey(key); },
-        "N2YO API key");
-    n2yoPassesCommand->add_option_function<int>("--days",
-        [&config](const int days) { config.setDays(days); },
-        "Number of days worth of passes to display (default 1, max 10)");
-    n2yoPassesCommand->add_option_function<int>("--elev",
-        [&config](const int elev) { config.setMinimumElevation(elev); },
-        "Filters out passes whose maximum elevation is below this number, in degrees (default 10)");
-    n2yoPassesCommand->add_option("id", n2yoIDs, "Norad ID(s) of satellite(s)");
+    ///// Satellite Info Command - view satellite information from local TLE database /////
 
     auto satInfoCommand = app.add_subcommand("info", "View satellite information from the local TLE database");
     
     std::vector<int> satInfoIDs;
     satInfoCommand->add_option("id", satInfoIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
-
-    auto tleCommand = app.add_subcommand("tle", "View raw TLE data from the local TLE database");
-    
-    std::vector<int> satTLEIDs;
-    tleCommand->add_option("id", satTLEIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
-
-    auto updateCommand = app.add_subcommand("update", "Update local TLE data from Celestrak");
-    
-    std::vector<std::string> groups;
-    updateCommand->add_option<std::vector<std::string>>("group", groups, "Celestrak TLE group(s) to download (default: active)");
-
-    auto geoCommand = app.add_subcommand("geo", "Get geodetic location (lat/long/alt) of the satellite at given time");
-
-    std::vector<int> geoIDs;
-    geoCommand->add_option("id", geoIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
-
-    // Look command - get current look angles for antenna pointing
-    auto lookCommand = app.add_subcommand("look", "Get look angles (azimuth/elevation/range) for antenna pointing");
-
-    std::vector<int> lookIDs;
-    lookCommand->add_option("id", lookIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
-    lookCommand->add_option_function<std::string>("--time",
-        [&config](const std::string &timeStr) {
-            std::istringstream in(timeStr);
-            std::chrono::system_clock::time_point tp;
-            in >> date::parse("%Y-%m-%d %H:%M:%S", tp);
-            if (in.fail()) {
-                throw std::invalid_argument("Invalid time format (expected YYYY-MM-DD HH:MM:SS UTC): " + timeStr);
-            }
-            config.setTime(tp);
-        }, "Time at which to get look angles (format: YYYY-MM-DD HH:MM:SS UTC)"
-    );
-
-    // Visible command - check if satellite is currently visible
-    auto visibleCommand = app.add_subcommand("visible", "Check if satellite is visible from ground station");
-
-    std::vector<int> visibleIDs;
-    visibleCommand->add_option("id", visibleIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
-    visibleCommand->add_option_function<int>("--elev",
-        [&config](const int elev) { config.setMinimumElevation(elev); },
-        "Minimum elevation above the horizon in degrees (default 10)");
-    visibleCommand->add_option_function<std::string>("--time",
-        [&config](const std::string &timeStr) {
-            std::istringstream in(timeStr);
-            std::chrono::system_clock::time_point tp;
-            in >> date::parse("%Y-%m-%d %H:%M:%S", tp);
-            if (in.fail()) {
-                throw std::invalid_argument("Invalid time format (expected YYYY-MM-DD HH:MM:SS UTC): " + timeStr);
-            }
-            config.setTime(tp);
-        }, "Time at which to check visibility (format: YYYY-MM-DD HH:MM:SS UTC)"
-    );
-
-    // Track command - real-time tracking output
-    auto trackCommand = app.add_subcommand("track", "Real-time tracking output (updates every interval)");
-
-    std::vector<int> trackIDs;
-    int trackInterval = 1;
-    int trackDuration = 60;
-    trackCommand->add_option("id", trackIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
-    trackCommand->add_option("--interval", trackInterval, "Update interval in seconds (default 1)");
-    trackCommand->add_option("--duration", trackDuration, "Duration to track in seconds (default 60)");
-
-    // Passes command - local pass prediction (no N2YO)
-    auto passesCommand = app.add_subcommand("passes", "Predict satellite passes (local calculation)");
-
-    std::vector<int> passesIDs;
-    passesCommand->add_option("id", passesIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
-    passesCommand->add_option_function<int>("--days",
-        [&config](const int days) { config.setDays(days); },
-        "Number of days to search for passes (default 1)");
-    passesCommand->add_option_function<int>("--elev",
-        [&config](const int elev) { config.setMinimumElevation(elev); },
-        "Filters out passes whose maximum elevation is below this number, in degrees (default 10)");
-passesCommand->add_option_function<int>("--horizon",
-        [&config](const int elev) { config.setHorizon(elev); },
-        "Passes start and end when the satellite crosses this elevation, in degrees (default 0)");
-        
-    geoCommand->add_option_function<std::string>("--time",
-        [&config](const std::string &timeStr) {
-            // Parse time string into time_point using date.h
-            std::istringstream in(timeStr);
-            std::chrono::system_clock::time_point tp;
-            in >> date::parse("%Y-%m-%d %H:%M:%S", tp);
-            if (in.fail()) {
-                throw std::invalid_argument("Invalid time format (expected YYYY-MM-DD HH:MM:SS UTC): " + timeStr);
-            }
-            config.setTime(tp);
-        }, "Time at which to get geodetic location (format: YYYY-MM-DD HH:MM:SS UTC)"
-    );
-
-    // Command callbacks
-
-    n2yoCommand->final_callback([n2yoCommand](void) {
-        if (n2yoCommand->get_subcommands().empty()) {
-           std::cerr << n2yoCommand->help() << std::endl;
-           std::exit(1);
-        }
-    });
-
-    n2yoTleCommand->final_callback([n2yoTleCommand, &config, &n2yoIDs](void) {
-        if (!config.hasAPIKey()) {
-            std::cerr << "Please provide your N2YO API key." << std::endl;
-            std::cerr << n2yoTleCommand->help() << std::endl;
-            std::exit(1);
-        }
-        if (n2yoIDs.empty()) {
-            std::cerr << "Please provide at least one satellite's Norad ID." << std::endl;
-            std::cerr << n2yoTleCommand->help() << std::endl;
-            std::exit(1);
-        }
-        try {
-            for (auto noradID : n2yoIDs) {
-                auto response = n2yo::getTLE(config.getAPIKey(), noradID, config.getVerbose());
-                std::cout << response.info.name << std::endl;
-                std::cout << response.tle << std::endl << std::endl;
-            }
-        } catch (const std::exception &err) {
-            std::cerr << err.what() << std::endl;
-            std::exit(1);
-        }
-    });
-
-    n2yoInfoCommand->final_callback([n2yoInfoCommand, &config, &n2yoIDs](void) {
-        if (!config.hasAPIKey()) {
-            std::cerr << "Please provide your N2YO API key." << std::endl;
-            std::cerr << n2yoInfoCommand->help() << std::endl;
-            std::exit(1);
-        }
-        if (n2yoIDs.empty()) {
-            std::cerr << "Please provide at least one satellite's Norad ID." << std::endl;
-            std::cerr << n2yoInfoCommand->help() << std::endl;
-            std::exit(1);
-        }
-        try {
-            for (auto noradID : n2yoIDs) {
-                auto response = n2yo::getTLE(config.getAPIKey(), noradID, config.getVerbose());
-                sattrack::Satellite orbit;
-                orbit.updateFromTLE(response.info.name, response.tle);
-                orbit.printInfo(std::cout);
-            }
-        } catch (const std::exception &err) {
-            std::cerr << err.what() << std::endl;
-            std::exit(1);
-        }
-    });
-
-    n2yoPassesCommand->final_callback([n2yoPassesCommand, &config, &n2yoIDs](void) {
-        if (!config.hasAPIKey()) {
-            std::cerr << "Please provide your N2YO API key." << std::endl;
-            std::cerr << n2yoPassesCommand->help() << std::endl;
-            std::exit(1);
-        }
-        if (n2yoIDs.empty()) {
-            std::cerr << "Please provide at least one satellite's Norad ID." << std::endl;
-            std::cerr << n2yoPassesCommand->help() << std::endl;
-            std::exit(1);
-        }
-        try {
-            struct RadioPassWrapper {
-                n2yo::SatelliteInfo info;
-                n2yo::RadioPass pass;
-            };
-
-            std::vector<sattrack::PassInfo> passes;
-
-            std::cerr << "Fetching Passes from N2YO..." << std::flush;
-            for (auto noradID : n2yoIDs) {
-                auto response = n2yo::getRadioPasses(config.getAPIKey(),
-                    noradID, config.getLatitude(), config.getLongitude(), config.getAltitude(),
-                    config.getDays(), config.getMinimumElevation(), config.getVerbose());
-                for (auto pass: response.passes) {
-                    passes.emplace_back(convertN2YOPassToPassInfo(pass, response.info));
-                }
-            }
-            std::cerr << " Done." << std::endl << std::endl << std::flush;
-            printPasses(passes);
-        } catch (const std::exception &err) {
-            std::cerr << err.what() << std::endl;
-            std::exit(1);
-        }
-    });
 
     satInfoCommand->final_callback([satInfoCommand, &satInfoIDs, &tleFilename](void) {
         try {
@@ -444,6 +201,13 @@ passesCommand->add_option_function<int>("--horizon",
         }
     });
 
+    ///// TLE Command - view raw TLE data from local TLE database /////
+
+    auto tleCommand = app.add_subcommand("tle", "View raw TLE data from the local TLE database");
+    
+    std::vector<int> satTLEIDs;
+    tleCommand->add_option("id", satTLEIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
+
     tleCommand->final_callback([tleCommand, &satTLEIDs, &tleFilename](void) {
         try {
             if (satTLEIDs.empty()) {
@@ -467,6 +231,12 @@ passesCommand->add_option_function<int>("--horizon",
         }
     });
 
+    ///// Update command - fetch latest TLE data from Celestrak /////
+
+    auto updateCommand = app.add_subcommand("update", "Update local TLE data from Celestrak");
+    
+    std::vector<std::string> groups;
+    updateCommand->add_option<std::vector<std::string>>("group", groups, "Celestrak TLE group(s) to download (default: active)");
 
     updateCommand->final_callback([&config, &groups, &tleFilename](void) {
         try {
@@ -494,6 +264,26 @@ passesCommand->add_option_function<int>("--horizon",
             std::exit(1);
         }
     });
+
+    ///// Geo Command - get geodetic location of satellite /////
+
+    auto geoCommand = app.add_subcommand("geo", "Get geodetic location (lat/long/alt) of the satellite at given time");
+
+    std::vector<int> geoIDs;
+    geoCommand->add_option("id", geoIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
+
+    geoCommand->add_option_function<std::string>("--time",
+        [&config](const std::string &timeStr) {
+            // Parse time string into time_point using date.h
+            std::istringstream in(timeStr);
+            std::chrono::system_clock::time_point tp;
+            in >> date::parse("%Y-%m-%d %H:%M:%S", tp);
+            if (in.fail()) {
+                throw std::invalid_argument("Invalid time format (expected YYYY-MM-DD HH:MM:SS UTC): " + timeStr);
+            }
+            config.setTime(tp);
+        }, "Time at which to get geodetic location (format: YYYY-MM-DD HH:MM:SS UTC)"
+    );
 
     geoCommand->final_callback([geoCommand, &config, &tleFilename, &geoIDs](void) {
         using namespace sattrack;
@@ -524,6 +314,23 @@ passesCommand->add_option_function<int>("--horizon",
             std::exit(1);
         }
     });
+
+    ///// Look command - get current look angles for antenna pointing /////
+    auto lookCommand = app.add_subcommand("look", "Get look angles (azimuth/elevation/range) for antenna pointing");
+
+    std::vector<int> lookIDs;
+    lookCommand->add_option("id", lookIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
+    lookCommand->add_option_function<std::string>("--time",
+        [&config](const std::string &timeStr) {
+            std::istringstream in(timeStr);
+            std::chrono::system_clock::time_point tp;
+            in >> date::parse("%Y-%m-%d %H:%M:%S", tp);
+            if (in.fail()) {
+                throw std::invalid_argument("Invalid time format (expected YYYY-MM-DD HH:MM:SS UTC): " + timeStr);
+            }
+            config.setTime(tp);
+        }, "Time at which to get look angles (format: YYYY-MM-DD HH:MM:SS UTC)"
+    );
 
     lookCommand->final_callback([lookCommand, &config, &tleFilename, &lookIDs](void) {
         using namespace sattrack;
@@ -567,6 +374,26 @@ passesCommand->add_option_function<int>("--horizon",
             std::exit(1);
         }
     });
+
+    ///// Visible command - check if satellite is currently visible from ground station /////
+    auto visibleCommand = app.add_subcommand("visible", "Check if satellite is visible from ground station");
+
+    std::vector<int> visibleIDs;
+    visibleCommand->add_option("id", visibleIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
+    visibleCommand->add_option_function<int>("--elev",
+        [&config](const int elev) { config.setMinimumElevation(elev); },
+        "Minimum elevation above the horizon in degrees (default 10)");
+    visibleCommand->add_option_function<std::string>("--time",
+        [&config](const std::string &timeStr) {
+            std::istringstream in(timeStr);
+            std::chrono::system_clock::time_point tp;
+            in >> date::parse("%Y-%m-%d %H:%M:%S", tp);
+            if (in.fail()) {
+                throw std::invalid_argument("Invalid time format (expected YYYY-MM-DD HH:MM:SS UTC): " + timeStr);
+            }
+            config.setTime(tp);
+        }, "Time at which to check visibility (format: YYYY-MM-DD HH:MM:SS UTC)"
+    );
 
     visibleCommand->final_callback([visibleCommand, &config, &tleFilename, &visibleIDs](void) {
         using namespace sattrack;
@@ -612,6 +439,16 @@ passesCommand->add_option_function<int>("--horizon",
             std::exit(1);
         }
     });
+
+    ///// Track command - real-time tracking output (updates every interval) /////
+    auto trackCommand = app.add_subcommand("track", "Real-time tracking output (updates every interval)");
+
+    std::vector<int> trackIDs;
+    int trackInterval = 1;
+    int trackDuration = 60;
+    trackCommand->add_option("id", trackIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
+    trackCommand->add_option("--interval", trackInterval, "Update interval in seconds (default 1)");
+    trackCommand->add_option("--duration", trackDuration, "Duration to track in seconds (default 60)");
 
     trackCommand->final_callback([trackCommand, &config, &tleFilename, &trackIDs, &trackInterval, &trackDuration](void) {
         using namespace sattrack;
@@ -678,6 +515,21 @@ passesCommand->add_option_function<int>("--horizon",
         }
     });
 
+    ///// Passes command - local pass prediction /////
+    auto passesCommand = app.add_subcommand("passes", "Predict satellite passes (local calculation)");
+
+    std::vector<int> passesIDs;
+    passesCommand->add_option("id", passesIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
+    passesCommand->add_option_function<int>("--days",
+        [&config](const int days) { config.setDays(days); },
+        "Number of days to search for passes (default 1)");
+    passesCommand->add_option_function<int>("--elev",
+        [&config](const int elev) { config.setMinimumElevation(elev); },
+        "Filters out passes whose maximum elevation is below this number, in degrees (default 10)");
+    passesCommand->add_option_function<int>("--horizon",
+        [&config](const int elev) { config.setHorizon(elev); },
+        "Passes start and end when the satellite crosses this elevation, in degrees (default 0)");
+
     passesCommand->final_callback([passesCommand, &config, &tleFilename, &passesIDs](void) {
         using namespace sattrack;
         try {
@@ -741,6 +593,8 @@ passesCommand->add_option_function<int>("--horizon",
             std::exit(1);
         }
     });
+
+    ///// End of command definitions /////
 
     CLI11_PARSE(app, argc, argv);
 

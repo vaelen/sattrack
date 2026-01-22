@@ -8,7 +8,7 @@
 
 #include <sattrack/config.hpp>
 #include <sattrack/satellite.hpp>
-#include <sattrack/n2yo.hpp>
 #include <sattrack/celestrak.hpp>
+#include <sattrack/daemon.hpp>
 
 #endif

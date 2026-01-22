@@ -62,6 +62,12 @@ if(NOT CLI11_INCLUDE_DIR)
     message(FATAL_ERROR "CLI11 not found. Please install libcli11-dev")
 endif()
 
+# spdlog (logging library)
+find_package(spdlog REQUIRED)
+
+# fmt (formatting library, required by spdlog)
+find_package(fmt REQUIRED)
+
 # Include directories
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
@@ -74,11 +80,11 @@ include_directories(
 # Source files
 set(SOURCES
     src/main.cpp
-    src/n2yo.cpp
     src/celestrak.cpp
     src/config.cpp
     src/satellite.cpp
     src/sgp4.cpp
+    src/daemon.cpp
     # Add more source files here as you create them
 )
 
@@ -89,6 +95,8 @@ add_executable(sattrack ${SOURCES})
 target_link_libraries(sattrack
     ${CURL_LIBRARIES}
     ${CURLPP_LIBRARIES}
+    spdlog::spdlog
+    fmt::fmt
 )
 
 # Install targets
@@ -118,4 +126,6 @@ message(STATUS "  libcurl: ${CURL_VERSION_STRING}")
 message(STATUS "  RapidJSON: ${RAPIDJSON_INCLUDE_DIRS}")
 message(STATUS "  curlpp: ${CURLPP_LIBRARIES}")
 message(STATUS "  CLI11: ${CLI11_INCLUDE_DIR}")
+message(STATUS "  spdlog: ${spdlog_VERSION}")
+message(STATUS "  fmt: ${fmt_VERSION}")
 message(STATUS "")
