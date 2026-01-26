@@ -6,30 +6,54 @@
 # This script downloads and cross-compiles the required dependencies
 # for building SatTrack as a statically-linked ARM executable.
 #
-# Prerequisites:
+# Supports two toolchains:
+#   1. glibc (default): arm-linux-gnueabihf
+#   2. musl (fully static): arm-linux-musleabihf
+#
+# Prerequisites for glibc:
 #   sudo apt-get install gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
 #
+# Prerequisites for musl (fully static build):
+#   Download from https://musl.cc/arm-linux-musleabihf-cross.tgz
+#   Extract to /opt and add to PATH
+#
 # Usage:
+#   # glibc build (default)
 #   ./scripts/build-arm-sysroot.sh
 #
-# The sysroot will be created at $HOME/arm-sysroot by default.
-# Override with: SYSROOT=/path/to/sysroot ./scripts/build-arm-sysroot.sh
+#   # musl build (fully static)
+#   TOOLCHAIN_PREFIX=arm-linux-musleabihf SYSROOT=~/arm-sysroot-musl ./scripts/build-arm-sysroot.sh
+#
+# Environment variables:
+#   SYSROOT          - Installation directory (default: ~/arm-sysroot)
+#   BUILD_DIR        - Build directory (default: ~/arm-sysroot-build)
+#   TOOLCHAIN_PREFIX - Cross-compiler prefix (default: arm-linux-gnueabihf)
+#   JOBS             - Parallel build jobs (default: nproc)
 
 set -e
 
-# Configuration
+# Get the directory containing this script (must be done before any cd)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "${SCRIPT_DIR}")"
+
+# Configuration (all can be overridden via environment variables)
+TOOLCHAIN_PREFIX="${TOOLCHAIN_PREFIX:-arm-linux-gnueabihf}"
 SYSROOT="${SYSROOT:-${HOME}/arm-sysroot}"
 BUILD_DIR="${BUILD_DIR:-${HOME}/arm-sysroot-build}"
-TOOLCHAIN_PREFIX="arm-linux-gnueabihf"
 JOBS="${JOBS:-$(nproc)}"
+
+# Select toolchain file based on prefix
+if [[ "${TOOLCHAIN_PREFIX}" == *"musl"* ]]; then
+    TOOLCHAIN_FILE="${PROJECT_DIR}/cmake/toolchains/arm-linux-musleabihf.cmake"
+else
+    TOOLCHAIN_FILE="${PROJECT_DIR}/cmake/toolchains/arm-linux-gnueabihf.cmake"
+fi
 
 # Library versions
 ZLIB_VERSION="1.3.1"
 OPENSSL_VERSION="3.0.13"
 CURL_VERSION="8.6.0"
 CURLPP_VERSION="0.8.1"
-BOOST_VERSION="1.84.0"
-BOOST_VERSION_UNDERSCORE="1_84_0"
 
 # Colors for output
 RED='\033[0;31m'
@@ -153,6 +177,9 @@ build_curl() {
     cd "curl-${CURL_VERSION}"
 
     # Configure with minimal features for smaller binary
+    # Note: For static cross-compilation, configure's link tests fail because
+    # they try to link ARM code with x86 libraries. We bypass these with cache
+    # variables that tell configure the OpenSSL functions exist.
     ./configure \
         --host="${TOOLCHAIN_PREFIX}" \
         --prefix="${SYSROOT}/usr" \
@@ -160,6 +187,9 @@ build_curl() {
         --enable-static \
         --with-openssl="${SYSROOT}/usr" \
         --with-zlib="${SYSROOT}/usr" \
+        --with-ca-bundle=/etc/ssl/certs/ca-certificates.crt \
+        ac_cv_lib_crypto_HMAC_Update=yes \
+        ac_cv_lib_ssl_SSL_connect=yes \
         --disable-ldap \
         --disable-ldaps \
         --disable-rtsp \
@@ -180,8 +210,9 @@ build_curl() {
         --without-nghttp2 \
         --without-brotli \
         --without-zstd \
-        CFLAGS="-I${SYSROOT}/usr/include" \
-        LDFLAGS="-L${SYSROOT}/usr/lib"
+        CPPFLAGS="-I${SYSROOT}/usr/include" \
+        LDFLAGS="-L${SYSROOT}/usr/lib" \
+        LIBS="-lssl -lcrypto -lz -latomic"
 
     make -j${JOBS}
     make install
@@ -206,10 +237,6 @@ build_curlpp() {
 
     cd "curlpp-${CURLPP_VERSION}"
     rm -rf build && mkdir -p build && cd build
-
-    # Get the script directory to find the toolchain file
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    TOOLCHAIN_FILE="${SCRIPT_DIR}/../cmake/toolchains/arm-linux-gnueabihf.cmake"
 
     if [ ! -f "${TOOLCHAIN_FILE}" ]; then
         # Fallback: create a minimal toolchain inline
@@ -243,42 +270,6 @@ build_curlpp() {
     log_info "curlpp installed to ${SYSROOT}/usr"
 }
 
-# Build Boost (system library only, static)
-build_boost() {
-    if [ -f "${SYSROOT}/usr/lib/libboost_system.a" ]; then
-        log_info "Boost already built, skipping"
-        return 0
-    fi
-
-    log_info "=== Building Boost ${BOOST_VERSION} ==="
-    cd "${BUILD_DIR}"
-    download_extract "https://boostorg.jfrog.io/artifactory/main/release/${BOOST_VERSION}/source/boost_${BOOST_VERSION_UNDERSCORE}.tar.gz" "boost_${BOOST_VERSION_UNDERSCORE}"
-    cd "boost_${BOOST_VERSION_UNDERSCORE}"
-
-    # Bootstrap b2
-    ./bootstrap.sh --prefix="${SYSROOT}/usr" --with-libraries=system
-
-    # Create user-config.jam for cross-compilation
-    cat > user-config.jam << EOF
-using gcc : arm : ${TOOLCHAIN_PREFIX}-g++ ;
-EOF
-
-    # Build and install
-    ./b2 install \
-        --user-config=user-config.jam \
-        --prefix="${SYSROOT}/usr" \
-        toolset=gcc-arm \
-        target-os=linux \
-        architecture=arm \
-        link=static \
-        runtime-link=shared \
-        threading=multi \
-        variant=release \
-        -j${JOBS}
-
-    log_info "Boost installed to ${SYSROOT}/usr"
-}
-
 # Main
 main() {
     log_info "Building ARM sysroot for SatTrack"
@@ -298,7 +289,6 @@ main() {
     build_openssl
     build_curl
     build_curlpp
-    build_boost
 
     echo
     log_info "=== ARM sysroot build complete ==="

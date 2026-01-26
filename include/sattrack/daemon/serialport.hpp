@@ -7,11 +7,9 @@
 #define __SATTRACK_DAEMON_SERIALPORT_HPP
 
 #include <string>
-#include <boost/asio.hpp>
+#include <asio.hpp>
 
 namespace sattrack::daemon {
-
-namespace asio = boost::asio;
 
 struct SerialPortOptions {
     int baudRate = 9600;

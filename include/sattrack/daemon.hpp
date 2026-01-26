@@ -12,12 +12,10 @@
 #include <thread>
 #include <queue>
 #include <condition_variable>
-#include <boost/asio.hpp>
+#include <asio.hpp>
 #include <sattrack/daemon/serialport.hpp>
 
 namespace sattrack {
-
-namespace asio = boost::asio;
 
 using daemon::SerialPortOptions;
 

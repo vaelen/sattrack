@@ -529,7 +529,10 @@ void Satellite::updateFromTLE(const std::string_view &tle) {
     bool firstLineParsed = false;
     bool secondLineParsed = false;
     for (auto line : tle | std::views::split('\n')) {
-        std::string_view lineView(line.begin(), line.end());
+        // GCC 11 doesn't support constructing string/string_view from split_view iterators
+        std::string lineStr;
+        std::ranges::copy(line, std::back_inserter(lineStr));
+        std::string_view lineView = lineStr;
         lineView = trimLeft(trimRight(lineView));
         if (lineView.starts_with("1 ")) {
             // NORAD ID is columns 3-7

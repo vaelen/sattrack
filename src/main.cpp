@@ -8,7 +8,7 @@
 #include <date/date.h>
 #include <filesystem>
 #include <fstream>
-#include <format>
+#include <spdlog/fmt/fmt.h>
 #include <chrono>
 #include <iomanip>
 #include <sstream>
@@ -96,8 +96,8 @@ void printPasses(std::vector<sattrack::PassInfo> passes) {
         std::sort(passes.begin(), passes.end(), comparator);
 
         std::cout << "Upcoming Passes:" << std::endl;
-        std::cout << std::format(rowFormat, "Satellite", "Start", "End", "Duration", "Starts In", "Start Az", "End Az", "Max Az", "Max Elev") << std::endl;
-        std::cout << std::format(rowFormat, sep25, sep25, sep25, sep14, sep18, sep12, sep12, sep12, sep10) << std::endl;
+        std::cout << fmt::format(rowFormat, "Satellite", "Start", "End", "Duration", "Starts In", "Start Az", "End Az", "Max Az", "Max Elev") << std::endl;
+        std::cout << fmt::format(rowFormat, sep25, sep25, sep25, sep14, sep18, sep12, sep12, sep12, sep10) << std::endl;
         for (const auto& pass : passes) {
             // Calculate all our times and durations
             auto startTime = pass.riseTime;
@@ -114,16 +114,16 @@ void printPasses(std::vector<sattrack::PassInfo> passes) {
             // Output the pass data
             auto startTimeSeconds = std::chrono::floor<std::chrono::seconds>(startTime);
             auto endTimeSeconds = std::chrono::floor<std::chrono::seconds>(endTime);
-            std::cout << std::format(rowFormat,
-                std::format(satFormat, pass.noradID, pass.name),
+            std::cout << fmt::format(rowFormat,
+                fmt::format(satFormat, pass.noradID, pass.name),
                 date::format(timeFormat, startTimeSeconds),
                 date::format(timeFormat, endTimeSeconds),
-                std::format(durationFormat, durationMins, durationSecs),
-                std::format(etaFormat, etaHours, etaMins, etaSecs),
-                std::format(azFormat, pass.riseAngles.azimuthInRadians * RADIANS_TO_DEGREES, azimuthToCompass(pass.riseAngles.azimuthInRadians)),
-                std::format(azFormat, pass.setAngles.azimuthInRadians * RADIANS_TO_DEGREES, azimuthToCompass(pass.setAngles.azimuthInRadians)),
-                std::format(azFormat, pass.maxAngles.azimuthInRadians * RADIANS_TO_DEGREES, azimuthToCompass(pass.maxAngles.azimuthInRadians)),
-                std::format(elFormat, pass.maxAngles.elevationInRadians * RADIANS_TO_DEGREES)) << std::endl;
+                fmt::format(durationFormat, durationMins, durationSecs),
+                fmt::format(etaFormat, etaHours, etaMins, etaSecs),
+                fmt::format(azFormat, pass.riseAngles.azimuthInRadians * RADIANS_TO_DEGREES, azimuthToCompass(pass.riseAngles.azimuthInRadians)),
+                fmt::format(azFormat, pass.setAngles.azimuthInRadians * RADIANS_TO_DEGREES, azimuthToCompass(pass.setAngles.azimuthInRadians)),
+                fmt::format(azFormat, pass.maxAngles.azimuthInRadians * RADIANS_TO_DEGREES, azimuthToCompass(pass.maxAngles.azimuthInRadians)),
+                fmt::format(elFormat, pass.maxAngles.elevationInRadians * RADIANS_TO_DEGREES)) << std::endl;
         }
         std::cout << std::endl;
     } catch (const std::exception &err) {
@@ -364,9 +364,9 @@ int main(int argc, char* argv[]) {
                 double elDeg = angles.elevationInRadians * RADIANS_TO_DEGREES;
 
                 std::cout << "Satellite: " << orbit.getName() << std::endl;
-                std::cout << "  Azimuth:   " << std::format("{:6.2f}", azDeg) << " deg (" << azimuthToCompass(angles.azimuthInRadians) << ")" << std::endl;
-                std::cout << "  Elevation: " << std::format("{:6.2f}", elDeg) << " deg" << std::endl;
-                std::cout << "  Range:     " << std::format("{:6.1f}", angles.rangeInKilometers) << " km" << std::endl;
+                std::cout << "  Azimuth:   " << fmt::format("{:6.2f}", azDeg) << " deg (" << azimuthToCompass(angles.azimuthInRadians) << ")" << std::endl;
+                std::cout << "  Elevation: " << fmt::format("{:6.2f}", elDeg) << " deg" << std::endl;
+                std::cout << "  Range:     " << fmt::format("{:6.1f}", angles.rangeInKilometers) << " km" << std::endl;
                 std::cout << std::endl;
             }
         } catch (const std::exception &err) {
@@ -429,9 +429,9 @@ int main(int argc, char* argv[]) {
 
                 std::cout << "Satellite: " << orbit.getName() << std::endl;
                 std::cout << "  Visible:   " << (visible ? "YES" : "NO") << " (min elevation: " << config.getMinimumElevation() << " deg)" << std::endl;
-                std::cout << "  Azimuth:   " << std::format("{:6.2f}", azDeg) << " deg (" << azimuthToCompass(angles.azimuthInRadians) << ")" << std::endl;
-                std::cout << "  Elevation: " << std::format("{:6.2f}", elDeg) << " deg" << std::endl;
-                std::cout << "  Range:     " << std::format("{:6.1f}", angles.rangeInKilometers) << " km" << std::endl;
+                std::cout << "  Azimuth:   " << fmt::format("{:6.2f}", azDeg) << " deg (" << azimuthToCompass(angles.azimuthInRadians) << ")" << std::endl;
+                std::cout << "  Elevation: " << fmt::format("{:6.2f}", elDeg) << " deg" << std::endl;
+                std::cout << "  Range:     " << fmt::format("{:6.1f}", angles.rangeInKilometers) << " km" << std::endl;
                 std::cout << std::endl;
             }
         } catch (const std::exception &err) {

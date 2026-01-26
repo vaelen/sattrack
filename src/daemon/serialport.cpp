@@ -13,7 +13,7 @@ using spdlog::error;
 
 namespace sattrack::daemon {
 
-using boost::system::error_code;
+using asio::error_code;
 
 SerialPort::SerialPort(asio::io_context& io, const std::string& name, const std::string& device, const SerialPortOptions& options)
     : name_(name)

@@ -17,7 +17,7 @@ It has the following features:
 Install dependencies:
 
 ```sh
-sudo apt install build-essential cmake libcurl4-openssl-dev libcurlpp-dev rapidjson-dev libcli11-dev libspdlog-dev libfmt-dev libboost-system-dev libgtest-dev
+sudo apt install build-essential cmake libcurl4-openssl-dev libcurlpp-dev libspdlog-dev libfmt-dev libgtest-dev
 ```
 
 Build the application:
@@ -29,6 +29,49 @@ cmake ..
 make
 make test
 ```
+
+### Cross-compilation for ARM (BeagleBone, Raspberry Pi, etc.)
+
+For a fully static build that runs on embedded ARM systems with older libraries:
+
+**Install the musl cross-compiler:**
+
+```sh
+cd /opt
+sudo wget https://musl.cc/arm-linux-musleabihf-cross.tgz
+sudo tar xzf arm-linux-musleabihf-cross.tgz
+sudo rm arm-linux-musleabihf-cross.tgz
+```
+
+Add the compiler to your PATH (add to `~/.bashrc` for persistence):
+
+```sh
+export PATH="/opt/arm-linux-musleabihf-cross/bin:$PATH"
+```
+
+**Build the ARM sysroot (one-time):**
+
+This builds static versions of zlib, OpenSSL, curl, and curlpp for ARM:
+
+```sh
+TOOLCHAIN_PREFIX=arm-linux-musleabihf SYSROOT=~/arm-sysroot-musl ./scripts/build-arm-sysroot.sh
+```
+
+**Build for ARM:**
+
+```sh
+mkdir build-arm && cd build-arm
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/arm-linux-musleabihf.cmake -DCMAKE_BUILD_TYPE=Release
+make
+```
+
+**Strip the binary (optional, reduces size from ~17MB to ~5MB):**
+
+```sh
+arm-linux-musleabihf-strip sattrack
+```
+
+The resulting binary is fully static with no runtime dependencies and will run on any armv7l Linux system regardless of the installed libc version.
 
 ## Implementation details
 
@@ -207,7 +250,7 @@ SatTrack depends on these libraries:
 4. [CLI11](https://github.com/CLIUtils/CLI11) for command-line argument parsing.
 5. [spdlog](https://github.com/gabime/spdlog) for fast, header-only logging.
 6. [fmt](https://github.com/fmtlib/fmt) for modern C++ string formatting (required by spdlog).
-7. [Boost.Asio](https://www.boost.org/doc/libs/release/doc/html/boost_asio.html) for cross-platform async I/O, signals, timers, and serial ports.
+7. [Asio](https://think-async.com/Asio/) for cross-platform async I/O, signals, timers, and serial ports (standalone, non-Boost version).
 8. [Google Test](https://github.com/google/googletest) for unit testing (only needed for running tests).
 
 SatTrack also depends on Howard Hinnant's [date library](https://howardhinnant.github.io/date/date.html) to support C++20 date/time functions that are not yet well supported by most compilers.

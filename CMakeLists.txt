@@ -30,17 +30,17 @@ endif()
 # =============================================================================
 include(FetchContent)
 
-# RapidJSON (header-only) - disable examples and tests
-set(RAPIDJSON_BUILD_DOC OFF CACHE BOOL "" FORCE)
-set(RAPIDJSON_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(RAPIDJSON_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+# RapidJSON (header-only) - only fetch, don't process its CMakeLists.txt
 FetchContent_Declare(
     rapidjson
     GIT_REPOSITORY https://github.com/Tencent/rapidjson.git
     GIT_TAG        v1.1.0
     GIT_SHALLOW    TRUE
 )
-FetchContent_MakeAvailable(rapidjson)
+FetchContent_GetProperties(rapidjson)
+if(NOT rapidjson_POPULATED)
+    FetchContent_Populate(rapidjson)
+endif()
 set(RAPIDJSON_INCLUDE_DIRS ${rapidjson_SOURCE_DIR}/include)
 
 # CLI11 (header-only)
@@ -51,6 +51,18 @@ FetchContent_Declare(
     GIT_SHALLOW    TRUE
 )
 FetchContent_MakeAvailable(cli11)
+
+# Asio (header-only, standalone version)
+FetchContent_Declare(
+    asio
+    GIT_REPOSITORY https://github.com/chriskohlhoff/asio.git
+    GIT_TAG        asio-1-30-2
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(asio)
+add_library(asio INTERFACE)
+target_include_directories(asio INTERFACE ${asio_SOURCE_DIR}/asio/include)
+target_compile_definitions(asio INTERFACE ASIO_STANDALONE)
 
 # spdlog - use FetchContent for static linking, system package otherwise
 if(SATTRACK_STATIC_LINK)
@@ -118,12 +130,6 @@ if(NOT CURLPP_INCLUDE_DIRS OR NOT CURLPP_LIBRARIES)
     message(FATAL_ERROR "curlpp not found. Please install libcurlpp-dev or build the ARM sysroot")
 endif()
 
-# Boost
-if(SATTRACK_STATIC_LINK)
-    set(Boost_USE_STATIC_LIBS ON)
-endif()
-find_package(Boost REQUIRED COMPONENTS system)
-
 # =============================================================================
 # Handle static linking dependencies
 # =============================================================================
@@ -153,7 +159,8 @@ if(SATTRACK_STATIC_LINK)
     if(ZLIB_LIBRARY_STATIC)
         list(APPEND CURL_STATIC_DEPS ${ZLIB_LIBRARY_STATIC})
     endif()
-    list(APPEND CURL_STATIC_DEPS pthread dl)
+    # pthread, dl are needed for OpenSSL; atomic is needed for 64-bit atomics on 32-bit ARM
+    list(APPEND CURL_STATIC_DEPS pthread dl atomic)
 endif()
 
 # =============================================================================
@@ -164,7 +171,6 @@ include_directories(
     ${CURL_INCLUDE_DIRS}
     ${RAPIDJSON_INCLUDE_DIRS}
     ${CURLPP_INCLUDE_DIRS}
-    ${Boost_INCLUDE_DIRS}
 )
 
 # =============================================================================
@@ -192,7 +198,7 @@ if(SATTRACK_STATIC_LINK)
         ${CURL_LIBRARIES}
         ${CURL_STATIC_DEPS}
         spdlog::spdlog
-        Boost::system
+        asio
         CLI11::CLI11
     )
 else()
@@ -201,7 +207,7 @@ else()
         ${CURLPP_LIBRARIES}
         spdlog::spdlog
         fmt::fmt
-        Boost::system
+        asio
         CLI11::CLI11
     )
 endif()
@@ -256,5 +262,5 @@ else()
     message(STATUS "  spdlog: ${spdlog_VERSION}")
     message(STATUS "  fmt: ${fmt_VERSION}")
 endif()
-message(STATUS "  Boost: ${Boost_VERSION}")
+message(STATUS "  Asio: FetchContent (v1.30.2)")
 message(STATUS "")
