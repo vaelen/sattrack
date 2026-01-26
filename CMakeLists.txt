@@ -182,6 +182,7 @@ set(SOURCES
     src/config.cpp
     src/satellite.cpp
     src/sgp4.cpp
+    src/gps.cpp
     src/daemon.cpp
     src/daemon/serialport.cpp
 )

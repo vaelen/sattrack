@@ -5,6 +5,7 @@
 
 #include <sattrack/daemon/serialport.hpp>
 #include <spdlog/spdlog.h>
+#include <spdlog/fmt/chrono.h>
 
 using spdlog::debug;
 using spdlog::info;
@@ -14,6 +15,9 @@ using spdlog::error;
 namespace sattrack::daemon {
 
 using asio::error_code;
+
+
+///// SerialPort Implementation /////
 
 SerialPort::SerialPort(asio::io_context& io, const std::string& name, const std::string& device, const SerialPortOptions& options)
     : name_(name)
@@ -103,7 +107,7 @@ void SerialPort::readNextPacket() {
 
             debug("Received on {} serial port: {}", name_, line);
 
-            processOutput(line.data(), len);
+            processOutput(line);
 
             // Continue reading
             readNextPacket();
@@ -134,6 +138,7 @@ std::string SerialPort::StopBitsToString(asio::serial_port_base::stop_bits::type
         default:
             return "?";
     }
+
 }
 
 std::string SerialPort::FlowControlToString(asio::serial_port_base::flow_control::type flowControl) {
@@ -149,11 +154,9 @@ std::string SerialPort::FlowControlToString(asio::serial_port_base::flow_control
     }
 }
 
-void SerialPort::processOutput(const char* data, std::size_t length) {
+void SerialPort::processOutput(std::string &data) {
     // Placeholder for processing incoming data from the serial port
-    std::string receivedData(data, length);
-    debug("Received data on {} serial port: {}", name_, receivedData);
-
+    info("Received data on {} serial port: {}", name_, data);
 }
 
 void SerialPort::sendCommand(const std::string& command) {
@@ -168,4 +171,54 @@ void SerialPort::sendCommand(const std::string& command) {
         });
 }
 
+///// GPSerialPort Implementation /////
+
+void GPSSerialPort::processOutput(std::string &data) {
+    debug("GPS received data: {}", data);
+
+    auto oldPosition = gps.getPosition();
+    auto oldTime = gps.getUTCTime();
+
+    gps.update(data);
+
+    auto newPosition = gps.getPosition();
+    auto newTime = gps.getUTCTime();
+
+    if (newPosition.has_value()) {
+        bool positionChanged = false;
+        auto newPos = newPosition.value();
+        auto newLat = newPos.latInRadians * RADIANS_TO_DEGREES;
+        auto newLon = newPos.lonInRadians * RADIANS_TO_DEGREES;
+        auto newAlt = newPos.altInKilometers;
+
+        if (!oldPosition.has_value()) {
+            positionChanged = true;
+        } else {
+            auto oldPos = oldPosition.value();
+            auto oldLat = oldPos.latInRadians * RADIANS_TO_DEGREES;
+            auto oldLon = oldPos.lonInRadians * RADIANS_TO_DEGREES;
+            auto oldAlt = oldPos.altInKilometers;
+
+            positionChanged = (std::abs(oldLat - newLat) >= GPS_CHANGE_THRESHOLD_DEGREES) ||
+                              (std::abs(oldLon - newLon) >= GPS_CHANGE_THRESHOLD_DEGREES) ||
+                              (std::abs(oldAlt - newAlt) >= GPS_CHANGE_THRESHOLD_KM);
+        }
+
+        if (positionChanged) {
+            info("GPS Position {}: Lat {:.6f}°, Lon {:.6f}°, Alt {:.2f} km",
+                 oldPosition.has_value() ? "Updated" : "Acquired", newLat, newLon, newAlt);
+        }
+
+    } else if (oldPosition.has_value() && !newPosition.has_value()) {
+        warn("GPS Position Lost");
+    }
+
+    if (!oldTime.has_value() && newTime.has_value()) {
+        info("GPS Time Acquired: {:%Y-%m-%d %H:%M:%S} UTC", newTime.value());
+    } else if (oldTime.has_value() && !newTime.has_value()) {
+        warn("GPS Time Lost");
+    }
+
 }
+
+} // namespace sattrack::daemon

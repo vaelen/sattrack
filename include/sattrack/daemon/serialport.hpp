@@ -8,8 +8,12 @@
 
 #include <string>
 #include <asio.hpp>
+#include <sattrack/gps.hpp>
 
 namespace sattrack::daemon {
+
+constexpr double GPS_CHANGE_THRESHOLD_DEGREES = 0.0001;
+constexpr double GPS_CHANGE_THRESHOLD_KM = 0.001;
 
 struct SerialPortOptions {
     int baudRate = 9600;
@@ -37,11 +41,11 @@ public:
     static std::string FlowControlToString(asio::serial_port_base::flow_control::type flowControl);
 
     /** Process incoming data from the serial port */
-    virtual void processOutput(const char* data, std::size_t length);
+    virtual void processOutput(std::string &data);
     /** Send a command to the serial port */
     virtual void sendCommand(const std::string& command);
 
-private:
+protected:
     std::string name_;
     std::string device_;
     SerialPortOptions options_;
@@ -49,6 +53,20 @@ private:
     asio::streambuf readBuffer_;
 
     virtual void readNextPacket();
+};
+
+class GPSSerialPort : public SerialPort {
+public:
+
+    GPSSerialPort(asio::io_context& io, const std::string& name, const std::string& device, const SerialPortOptions& options, GPS& gps)
+        : SerialPort(io, name, device, options), gps(gps) {};
+    
+    virtual ~GPSSerialPort() = default;
+
+    void processOutput(std::string &data) override;
+
+protected:
+    GPS&gps;
 };
 
 }

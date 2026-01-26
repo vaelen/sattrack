@@ -53,7 +53,8 @@ private:
     std::thread ioThread;
     asio::io_context io;
     asio::signal_set signals{io, SIGINT, SIGTERM};
-    std::unique_ptr<daemon::SerialPort> gpsSerialPort;
+    GPS gps;
+    std::unique_ptr<daemon::GPSSerialPort> gpsSerialPort;
     std::unique_ptr<daemon::SerialPort> rotatorSerialPort;
     std::unique_ptr<daemon::SerialPort> radioSerialPort;
 

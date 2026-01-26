@@ -45,7 +45,7 @@ void Daemon::start() {
 
     SerialPortOptions gpsPortOptions;
     gpsPortOptions.readTerminator = "\r\n";
-    gpsSerialPort = std::make_unique<daemon::SerialPort>(io, "GPS", "/dev/ttyS1", gpsPortOptions);
+    gpsSerialPort = std::make_unique<daemon::GPSSerialPort>(io, "GPS", "/dev/ttyS1", gpsPortOptions, gps);
     gpsSerialPort->start();
 
     SerialPortOptions rotatorPortOptions;
