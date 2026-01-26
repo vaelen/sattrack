@@ -37,7 +37,21 @@ target_link_libraries(celestrak_test
     ${CURLPP_LIBRARIES}
 )
 
+# GPS tests
+add_executable(gps_test
+    gps_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/gps.cpp
+    ${LIB_SOURCES}
+)
+
+target_link_libraries(gps_test
+    GTest::gtest
+    GTest::gtest_main
+    spdlog::spdlog
+)
+
 # Register tests with CTest
 include(GoogleTest)
 gtest_discover_tests(satellite_test)
 gtest_discover_tests(celestrak_test)
+gtest_discover_tests(gps_test)
