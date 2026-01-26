@@ -8,6 +8,7 @@
 #include <date/date.h>
 #include <filesystem>
 #include <fstream>
+#include <spdlog/spdlog.h>
 #include <spdlog/fmt/fmt.h>
 #include <chrono>
 #include <iomanip>
@@ -544,12 +545,35 @@ int main(int argc, char* argv[]) {
     daemonCommand->add_option_function<int>("--horizon",
         [&config](const int elev) { config.setHorizon(elev); },
         "Passes start and end when the satellite crosses this elevation, in degrees (default 0)");
+
     daemonCommand->add_option_function<int>("--elev",
         [&config](const int elev) { config.setMinimumElevation(elev); },
         "Filters out passes whose maximum elevation is below this number, in degrees (default 10)");
 
-    daemonCommand->final_callback([](void) {
+    daemonCommand->add_option_function<std::string>("--gps",
+        [&config](const std::string &devicePath) {
+            config.setGPSSerialPort(devicePath);
+        },
+        "Serial port device path for GPS receiver (default: /dev/ttyS1)"
+    );
+
+    daemonCommand->add_option_function<std::string>("--radio",
+        [&config](const std::string &devicePath) {
+            config.setRadioSerialPort(devicePath);
+        },
+        "Serial port device path for Radio TNC (default: /dev/ttyS2)"
+    );
+
+    daemonCommand->add_option_function<std::string>("--rotator",
+        [&config](const std::string &devicePath) {
+            config.setRotatorSerialPort(devicePath);
+        },
+        "Serial port device path for Rotator controller (default: /dev/ttyS4)"
+    );
+
+    daemonCommand->final_callback([&config](void) {
         try {
+            spdlog::set_level(config.getVerbose() ? spdlog::level::debug : spdlog::level::info);
             sattrack::Daemon daemon;
             daemon.start();
             daemon.wait();

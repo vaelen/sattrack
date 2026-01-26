@@ -44,16 +44,16 @@ void Daemon::start() {
     // TODO: Add serial port configuration options
 
     SerialPortOptions gpsPortOptions;
-    gpsSerialPort = std::make_unique<daemon::SerialPort>(io, "GPS", "/dev/ttyUSB1", gpsPortOptions);
+    gpsSerialPort = std::make_unique<daemon::SerialPort>(io, "GPS", "/dev/ttyS1", gpsPortOptions);
     gpsSerialPort->start();
 
     SerialPortOptions rotatorPortOptions;
-    rotatorSerialPort = std::make_unique<daemon::SerialPort>(io, "Rotator", "/dev/ttyUSB2", rotatorPortOptions);
+    rotatorSerialPort = std::make_unique<daemon::SerialPort>(io, "Rotator", "/dev/ttyS2", rotatorPortOptions);
     rotatorSerialPort->start();
 
     SerialPortOptions radioPortOptions;
     radioPortOptions.baudRate = 38400;
-    radioSerialPort = std::make_unique<daemon::SerialPort>(io, "Radio", "/dev/ttyUSB4", radioPortOptions);
+    radioSerialPort = std::make_unique<daemon::SerialPort>(io, "Radio", "/dev/ttyS4", radioPortOptions);
     radioSerialPort->start();
 
     ioThread = std::thread([this]{ io.run(); });

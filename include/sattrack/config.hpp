@@ -49,6 +49,25 @@ public:
 
     time_point getTime();
     void setTime(const time_point tp);
+
+    std::string getGPSSerialPort();
+    void setGPSSerialPort(const std::string &port);
+
+    int getGPSBaudRate();
+    void setGPSBaudRate(int baudRate);
+
+    std::string getRotatorSerialPort();
+    void setRotatorSerialPort(const std::string &port);
+
+    int getRotatorBaudRate();
+    void setRotatorBaudRate(int baudRate);
+
+    std::string getRadioSerialPort();
+    void setRadioSerialPort(const std::string &port);
+
+    int getRadioBaudRate();
+    void setRadioBaudRate(int baudRate);
+
 private:
     std::optional<std::string> apiKey;
     double longitude;
@@ -59,6 +78,12 @@ private:
     bool verbose;
     time_point time;
     int horizon;
+    std::string gpsSerialPort;
+    int gpsBaudRate;
+    std::string rotatorSerialPort;
+    int rotatorBaudRate;
+    std::string radioSerialPort;
+    int radioBaudRate;
 };
 
 }

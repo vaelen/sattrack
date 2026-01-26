@@ -123,4 +123,52 @@ void Config::setHorizon(const int degrees) {
     }
 }
 
+std::string Config::getGPSSerialPort() {
+    return gpsSerialPort;
+}
+
+void Config::setGPSSerialPort(const std::string &port) {
+    gpsSerialPort = port;
+}
+
+int Config::getGPSBaudRate() {
+    return gpsBaudRate;
+}
+
+void Config::setGPSBaudRate(int baudRate) {
+    gpsBaudRate = baudRate;
+}
+
+std::string Config::getRotatorSerialPort() {
+    return rotatorSerialPort;
+}
+
+void Config::setRotatorSerialPort(const std::string &port) {
+    rotatorSerialPort = port;
+}
+
+int Config::getRotatorBaudRate() {
+    return rotatorBaudRate;
+}
+
+void Config::setRotatorBaudRate(int baudRate) {
+    rotatorBaudRate = baudRate;
+}
+
+std::string Config::getRadioSerialPort() {
+    return radioSerialPort;
+}
+
+void Config::setRadioSerialPort(const std::string &port) {
+    radioSerialPort = port;
+}
+
+int Config::getRadioBaudRate() {
+    return radioBaudRate;
+}
+
+void Config::setRadioBaudRate(int baudRate) {
+    radioBaudRate = baudRate;
+}
+
 }
