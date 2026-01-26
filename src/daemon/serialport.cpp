@@ -101,6 +101,8 @@ void SerialPort::readNextPacket() {
             std::string line(asio::buffers_begin(bufs), asio::buffers_begin(bufs) + len);
             readBuffer_.consume(bytes_transferred);
 
+            debug("Received on {} serial port: {}", name_, line);
+
             processOutput(line.data(), len);
 
             // Continue reading

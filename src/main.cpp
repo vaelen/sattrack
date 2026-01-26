@@ -550,21 +550,21 @@ int main(int argc, char* argv[]) {
         [&config](const int elev) { config.setMinimumElevation(elev); },
         "Filters out passes whose maximum elevation is below this number, in degrees (default 10)");
 
-    daemonCommand->add_option_function<std::string>("--gps",
+    daemonCommand->add_option_function<std::string>("--gps-device",
         [&config](const std::string &devicePath) {
             config.setGPSSerialPort(devicePath);
         },
         "Serial port device path for GPS receiver (default: /dev/ttyS1)"
     );
 
-    daemonCommand->add_option_function<std::string>("--radio",
+    daemonCommand->add_option_function<std::string>("--radio-device",
         [&config](const std::string &devicePath) {
             config.setRadioSerialPort(devicePath);
         },
         "Serial port device path for Radio TNC (default: /dev/ttyS2)"
     );
 
-    daemonCommand->add_option_function<std::string>("--rotator",
+    daemonCommand->add_option_function<std::string>("--rotator-device",
         [&config](const std::string &devicePath) {
             config.setRotatorSerialPort(devicePath);
         },
