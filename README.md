@@ -17,7 +17,7 @@ It has the following features:
 Install dependencies:
 
 ```sh
-sudo apt install build-essential cmake libcurl4-openssl-dev libcurlpp-dev rapidjson-dev libcli11-dev libspdlog-dev libfmt-dev libgtest-dev
+sudo apt install build-essential cmake libcurl4-openssl-dev libcurlpp-dev rapidjson-dev libcli11-dev libspdlog-dev libfmt-dev libboost-system-dev libgtest-dev
 ```
 
 Build the application:
@@ -207,7 +207,8 @@ SatTrack depends on these libraries:
 4. [CLI11](https://github.com/CLIUtils/CLI11) for command-line argument parsing.
 5. [spdlog](https://github.com/gabime/spdlog) for fast, header-only logging.
 6. [fmt](https://github.com/fmtlib/fmt) for modern C++ string formatting (required by spdlog).
-7. [Google Test](https://github.com/google/googletest) for unit testing (only needed for running tests).
+7. [Boost.Asio](https://www.boost.org/doc/libs/release/doc/html/boost_asio.html) for cross-platform async I/O, signals, timers, and serial ports.
+8. [Google Test](https://github.com/google/googletest) for unit testing (only needed for running tests).
 
 SatTrack also depends on Howard Hinnant's [date library](https://howardhinnant.github.io/date/date.html) to support C++20 date/time functions that are not yet well supported by most compilers.
 

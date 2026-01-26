@@ -26,7 +26,7 @@ std::string expandTilde(const std::string &path) {
         if (home) {
             return std::string(home) + path.substr(1);
         }
-    }
+    } 
     return path;
 }
 
@@ -440,81 +440,6 @@ int main(int argc, char* argv[]) {
         }
     });
 
-    ///// Track command - real-time tracking output (updates every interval) /////
-    auto trackCommand = app.add_subcommand("track", "Real-time tracking output (updates every interval)");
-
-    std::vector<int> trackIDs;
-    int trackInterval = 1;
-    int trackDuration = 60;
-    trackCommand->add_option("id", trackIDs, "Norad ID(s) of satellite(s) (ie. 25544)");
-    trackCommand->add_option("--interval", trackInterval, "Update interval in seconds (default 1)");
-    trackCommand->add_option("--duration", trackDuration, "Duration to track in seconds (default 60)");
-
-    trackCommand->final_callback([trackCommand, &config, &tleFilename, &trackIDs, &trackInterval, &trackDuration](void) {
-        using namespace sattrack;
-        try {
-            if (trackIDs.empty()) {
-                std::cerr << "Please provide at least one satellite's Norad ID." << std::endl;
-                std::cerr << trackCommand->help() << std::endl;
-                std::exit(1);
-            }
-            std::map<int, sattrack::Satellite> satellites;
-            loadTLEDatabase(tleFilename, satellites);
-
-            sattrack::Geodetic observer{
-                config.getLatitude() * DEGREES_TO_RADIANS,
-                config.getLongitude() * DEGREES_TO_RADIANS,
-                config.getAltitude() / 1000.0
-            };
-
-            // Verify all satellites exist
-            for (auto noradID : trackIDs) {
-                if (!satellites.contains(noradID)) {
-                    std::cerr << "Satellite with Norad ID " << noradID << " not found in the local TLE database." << std::endl;
-                    std::exit(1);
-                }
-            }
-
-            constexpr std::string_view headerFormat = "{:<20} {:>10} {:>5} {:>12} {:>10}";
-            constexpr std::string_view rowFormat = "{:<20} {:>7.2f} {:>3} {:>8.2f} {:>10.1f}";
-
-            std::cout << std::format(headerFormat, "Satellite", "Azimuth", "", "Elevation", "Range (km)") << std::endl;
-            std::cout << std::string(60, '-') << std::endl;
-
-            auto startTime = std::chrono::system_clock::now();
-            auto endTime = startTime + std::chrono::seconds(trackDuration);
-
-            while (std::chrono::system_clock::now() < endTime) {
-                auto now = std::chrono::system_clock::now();
-                double julianDate = sattrack::toJulianDate(now);
-
-                for (auto noradID : trackIDs) {
-                    auto& orbit = satellites[noradID];
-                    auto angles = sattrack::getLookAngles(orbit, observer, julianDate);
-
-                    double azDeg = angles.azimuthInRadians * RADIANS_TO_DEGREES;
-                    double elDeg = angles.elevationInRadians * RADIANS_TO_DEGREES;
-
-                    std::cout << std::format(rowFormat,
-                        orbit.getName().substr(0, 20),
-                        azDeg,
-                        azimuthToCompass(angles.azimuthInRadians),
-                        elDeg,
-                        angles.rangeInKilometers) << std::endl;
-                }
-
-                if (trackIDs.size() > 1) {
-                    std::cout << std::endl;
-                }
-
-                std::this_thread::sleep_for(std::chrono::seconds(static_cast<long>(trackInterval)));
-            }
-        } catch (const std::exception &err) {
-            std::cerr << err.what() << std::endl;
-            std::exit(1);
-        }
-    });
-
     ///// Passes command - local pass prediction /////
     auto passesCommand = app.add_subcommand("passes", "Predict satellite passes (local calculation)");
 
@@ -588,6 +513,46 @@ int main(int argc, char* argv[]) {
 
             printPasses(passes);
 
+        } catch (const std::exception &err) {
+            std::cerr << err.what() << std::endl;
+            std::exit(1);
+        }
+    });
+
+    ///// Daemon command - run sattrack as a background daemon service /////
+    auto daemonCommand = app.add_subcommand("daemon", "Run SatTrack as a background daemon service");
+
+    std::vector<int> daemonNoradIDs;
+    daemonCommand->add_option("id", daemonNoradIDs, "Norad ID(s) of satellite(s) to track (ie. 25544)");    
+
+    daemonCommand->add_option_function<std::string>("--radio",
+        [&config](const std::string& radioInfoString) {
+            // Parse radio info string0
+            sattrack::Radio radio = sattrack::parseRadioInfo(radioInfoString);
+            // Store the radio info somewhere accessible to the daemon
+            // For this example, we'll just print it
+            std::cout << "Configured radio for Norad ID " << radio.noradID << ":" << std::endl;
+            std::cout << "  Type: " << (radio.type == sattrack::RadioType::UPLINK ? "Uplink" : "Downlink") << std::endl;
+            std::cout << "  Frequency: " << radio.baseFrequencyInKHz << " kHz" << std::endl;
+            std::cout << "  Mode: " << radio.mode << std::endl;
+            std::cout << "  Modulation: " << radio.modulation << std::endl;
+            std::cout << "  Packeting: " << radio.packeting << std::endl;
+         }, 
+        "Radio configuration in the format NORAD_ID:TYPE:FREQUENCY_KHZ:MODE:MODULATION:PACKETING "
+        "(ie. 25544:DOWNLINK:145800:FM:GMSK9600:APRS)");
+
+    daemonCommand->add_option_function<int>("--horizon",
+        [&config](const int elev) { config.setHorizon(elev); },
+        "Passes start and end when the satellite crosses this elevation, in degrees (default 0)");
+    daemonCommand->add_option_function<int>("--elev",
+        [&config](const int elev) { config.setMinimumElevation(elev); },
+        "Filters out passes whose maximum elevation is below this number, in degrees (default 10)");
+
+    daemonCommand->final_callback([](void) {
+        try {
+            sattrack::Daemon daemon;
+            daemon.start();
+            daemon.wait();
         } catch (const std::exception &err) {
             std::cerr << err.what() << std::endl;
             std::exit(1);

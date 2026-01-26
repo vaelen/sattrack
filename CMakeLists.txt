@@ -68,6 +68,9 @@ find_package(spdlog REQUIRED)
 # fmt (formatting library, required by spdlog)
 find_package(fmt REQUIRED)
 
+# Boost (Asio for async I/O, signals, timers, serial ports)
+find_package(Boost REQUIRED COMPONENTS system)
+
 # Include directories
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
@@ -75,6 +78,7 @@ include_directories(
     ${RAPIDJSON_INCLUDE_DIRS}
     ${CURLPP_INCLUDE_DIRS}
     ${CLI11_INCLUDE_DIR}
+    ${Boost_INCLUDE_DIRS}
 )
 
 # Source files
@@ -85,7 +89,7 @@ set(SOURCES
     src/satellite.cpp
     src/sgp4.cpp
     src/daemon.cpp
-    # Add more source files here as you create them
+    src/daemon/serialport.cpp
 )
 
 # Create executable
@@ -97,6 +101,7 @@ target_link_libraries(sattrack
     ${CURLPP_LIBRARIES}
     spdlog::spdlog
     fmt::fmt
+    Boost::system
 )
 
 # Install targets
@@ -128,4 +133,5 @@ message(STATUS "  curlpp: ${CURLPP_LIBRARIES}")
 message(STATUS "  CLI11: ${CLI11_INCLUDE_DIR}")
 message(STATUS "  spdlog: ${spdlog_VERSION}")
 message(STATUS "  fmt: ${fmt_VERSION}")
+message(STATUS "  Boost: ${Boost_VERSION}")
 message(STATUS "")

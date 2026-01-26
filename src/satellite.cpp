@@ -911,4 +911,189 @@ void saveTLEDatabase(std::ostream &s, const std::map<int, Satellite> &database, 
     logStream << std::flush;
 }
 
+std::optional<Radio> Satellite::getUplinkRadio() const {
+    return uplink.baseFrequencyInKHz > 0.0 ? std::optional<Radio>(uplink) : std::nullopt;
+}
+
+std::optional<Radio> Satellite::getDownlinkRadio() const {
+    return downlink.baseFrequencyInKHz > 0.0 ? std::optional<Radio>(downlink) : std::nullopt;
+}
+
+std::ostream& operator<<(std::ostream &os, const RadioType &type) {
+    switch (type) {
+        case RadioType::UPLINK:
+            os << "UPLINK";
+            break;
+        case RadioType::DOWNLINK:
+            os << "DOWNLINK";
+            break;
+    }
+    return os;
+}
+
+std::ostream& operator<<(std::ostream &os, const RadioMode &mode) {
+    switch (mode) {
+        case RadioMode::FM:
+            os << "FM";
+            break;
+        case RadioMode::AM:
+            os << "AM";
+            break;
+        case RadioMode::LSB:
+            os << "LSB";
+            break;
+        case RadioMode::USB:
+            os << "USB";
+            break;
+        case RadioMode::CW:
+            os << "CW";
+            break;
+        case RadioMode::DIGITAL:
+            os << "DIGITAL";
+            break;
+    }
+    return os;
+}
+
+std::ostream& operator<<(std::ostream &os, const RadioModulation &modulation) {
+    switch (modulation) {
+        case RadioModulation::Voice:
+            os << "Voice";
+            break;
+        case RadioModulation::CW:
+            os << "CW";
+            break;
+        case RadioModulation::RTTY:
+            os << "RTTY";
+            break;
+        case RadioModulation::AFSK1200:
+            os << "AFSK1200";
+            break;
+        case RadioModulation::GMSK9600:
+            os << "GMSK9600";
+            break;
+        case RadioModulation::QPSK31:
+            os << "QPSK31";
+            break;
+        case RadioModulation::BPSK125:
+            os << "BPSK125";
+            break;
+        case RadioModulation::OTHER:
+            os << "OTHER";
+            break;
+    }
+    return os;
+}
+
+std::ostream& operator<<(std::ostream &os, const RadioPacketing &packeting) {
+    switch (packeting) {
+        case RadioPacketing::None:
+            os << "None";
+            break;
+        case RadioPacketing::AX25:
+            os << "AX25";
+            break;
+        case RadioPacketing::APRS:
+            os << "APRS";
+            break;
+        case RadioPacketing::OTHER:
+            os << "OTHER";
+            break;
+    }
+    return os;
+}
+
+/**
+* Parse radio information from a config string
+* Format: "<noradID>:<type>:<frequency_kHz>:<mode>:<modulation>:<packeting>"
+* Example: "25544:DOWNLINK:145800:FM:GMSK9600:APRS"
+*/
+Radio parseRadioInfo(const std::string_view &infoStr) {
+    Radio radio;
+
+    auto parts = infoStr | std::views::split(':') | std::views::transform([](auto &&rng) {
+        return std::string_view(&*rng.begin(), std::ranges::distance(rng));
+    });
+
+    auto it = parts.begin();
+
+    if (it == parts.end()) throw std::invalid_argument("Invalid radio info string: " + std::string(infoStr));
+  
+    radio.noradID = toNumber<int>(*it++);
+    
+    if (it == parts.end()) throw std::invalid_argument("Invalid radio info string: " + std::string(infoStr));
+  
+    std::string_view typeStr = *it++;
+    if (typeStr == "UPLINK") {
+        radio.type = RadioType::UPLINK;
+    } else if (typeStr == "DOWNLINK") {
+        radio.type = RadioType::DOWNLINK;
+    } else {
+        throw std::invalid_argument("Invalid radio type: " + std::string(typeStr));
+    }
+    
+    if (it == parts.end()) throw std::invalid_argument("Invalid radio info string: " + std::string(infoStr));
+   
+    radio.baseFrequencyInKHz = toNumber<unsigned long>(*it++);
+  
+    if (it == parts.end()) throw std::invalid_argument("Invalid radio info string: " + std::string(infoStr));
+    
+    std::string_view modeStr = *it++;
+    if (modeStr == "FM") {
+        radio.mode = RadioMode::FM;
+    } else if (modeStr == "AM") {
+        radio.mode = RadioMode::AM;
+    } else if (modeStr == "LSB") {
+        radio.mode = RadioMode::LSB;
+    } else if (modeStr == "USB") {
+        radio.mode = RadioMode::USB;std::ostream& operator<<(std::ostream &os, const RadioType &type);
+    } else if (modeStr == "CW") {
+        radio.mode = RadioMode::CW;
+    } else if (modeStr == "DIGITAL") {
+        radio.mode = RadioMode::DIGITAL;
+    } else {
+        throw std::invalid_argument("Invalid radio mode: " + std::string(modeStr));
+    }
+    
+    if (it == parts.end()) throw std::invalid_argument("Invalid radio info string: " + std::string(infoStr));
+    
+    std::string_view modulationStr = *it++;
+    if (modulationStr == "Voice") {
+        radio.modulation = RadioModulation::Voice;
+    } else if (modulationStr == "CW") {
+        radio.modulation = RadioModulation::CW;
+    } else if (modulationStr == "RTTY") {
+        radio.modulation = RadioModulation::RTTY;
+    } else if (modulationStr == "AFSK1200") {
+        radio.modulation = RadioModulation::AFSK1200;
+    } else if (modulationStr == "GMSK9600") {
+        radio.modulation = RadioModulation::GMSK9600;
+    } else if (modulationStr == "QPSK31") {
+        radio.modulation = RadioModulation::QPSK31;
+    } else if (modulationStr == "BPSK125") {
+        radio.modulation = RadioModulation::BPSK125;
+    } else if (modulationStr == "OTHER") {
+        radio.modulation = RadioModulation::OTHER;
+    } else {
+        throw std::invalid_argument("Invalid radio modulation: " + std::string(modulationStr));
+    }
+    
+    if (it == parts.end()) throw std::invalid_argument("Invalid radio info string: " + std::string(infoStr));
+    
+    std::string_view packetingStr = *it++;
+    if (packetingStr == "None") {
+        radio.packeting = RadioPacketing::None;
+    } else if (packetingStr == "AX25") {
+        radio.packeting = RadioPacketing::AX25;
+    } else if (packetingStr == "APRS") {
+        radio.packeting = RadioPacketing::APRS;
+    } else if (packetingStr == "OTHER") {
+        radio.packeting = RadioPacketing::OTHER;
+    } else {
+        throw std::invalid_argument("Invalid radio packeting: " + std::string(packetingStr));
+    }
+
+    return radio;
+}
+
 } // namespace sattrack

@@ -124,6 +124,65 @@ struct PassInfo {
     LookAngles setAngles;         ///< Azimuth/elevation at set
 };
 
+enum class RadioType {
+    UPLINK,
+    DOWNLINK
+};
+
+std::ostream& operator<<(std::ostream &os, const RadioType &type);
+
+enum class RadioMode {
+    FM,
+    AM,
+    LSB,
+    USB,
+    CW,
+    DIGITAL
+};
+
+std::ostream& operator<<(std::ostream &os, const RadioMode &mode);
+
+enum class RadioModulation {
+    Voice,
+    CW,
+    RTTY,
+    AFSK1200,
+    GMSK9600,
+    QPSK31,
+    BPSK125,
+    OTHER
+};
+
+std::ostream& operator<<(std::ostream &os, const RadioModulation &modulation);
+
+enum class RadioPacketing {
+    None,
+    AX25,
+    APRS,
+    OTHER
+};
+
+std::ostream& operator<<(std::ostream &os, const RadioPacketing &packeting);
+
+/**
+ * Radio Information for a satellite
+ */
+struct Radio {
+    int noradID;                        ///< NORAD Catalog ID of the satellitD:145800e
+    RadioType type;                     ///< Uplink or Downlink
+    unsigned long baseFrequencyInKHz;   ///< Base frequency in kHz
+    RadioMode mode;                     ///< Radio mode (e.g. "FM", "SSB", "CW", etc.)
+    RadioModulation modulation;         ///< Type of modulation (e.g. "Voice", "RTTY", "AFSK1200", etc.)
+    RadioPacketing packeting;           ///< Type of packeting (e.g. "AX25", "APRS", etc.)
+};
+
+/**
+* Parse radio information from a config string
+* Format: "<noradID>:<type>:<frequency_kHz>:<mode>:<modulation>:<packeting>"
+* Example: "25544:DOWNLINK:145800:FM:GMSK9600:APRS"
+*/
+Radio parseRadioInfo(const std::string_view &infoStr);
+
 // ============================================================================
 // Satellite Class with SGP4 Propagation
 // ============================================================================
@@ -148,7 +207,7 @@ public:
     ~Satellite() = default;
 
     /**
-     * Update orbital elements from a TLE string with a separate name.
+     * Update orbital elements from a TLE string with a separate name.n2
      */
     void updateFromTLE(const std::string_view &name, const std::string_view &tle);
 
@@ -168,7 +227,7 @@ public:
     double getBstarDragTerm() const;
     int getElementSetNumber() const;
 
-    // Accessors for orbital elements
+    // Accessors for orbital elementsn2
     double getInclination() const;
     double getRightAscensionOfAscendingNode() const;
     double getEccentricity() const;
@@ -215,6 +274,16 @@ public:
      */
     std::string getTLE() const;
 
+    /**
+     * Get uplink radio information, if available.
+     */
+    std::optional<Radio> getUplinkRadio() const;
+
+    /**
+     * Get downlink radio information, if available.
+     */
+    std::optional<Radio> getDownlinkRadio() const;
+
 private:
     // ========================================================================
     // TLE Data
@@ -250,6 +319,10 @@ private:
      * Called lazily on first propagation.
      */
     void ensureSGP4Initialized() const;
+
+    // Radio Information
+    Radio uplink;
+    Radio downlink;
 };
 
 // ============================================================================
