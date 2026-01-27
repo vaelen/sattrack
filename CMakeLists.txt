@@ -184,7 +184,7 @@ set(SOURCES
     src/sgp4.cpp
     src/gps.cpp
     src/daemon.cpp
-    src/daemon/serialport.cpp
+    src/serialport.cpp
 )
 
 # =============================================================================

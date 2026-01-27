@@ -13,11 +13,9 @@
 #include <queue>
 #include <condition_variable>
 #include <asio.hpp>
-#include <sattrack/daemon/serialport.hpp>
+#include <sattrack/serialport.hpp>
 
 namespace sattrack {
-
-using daemon::SerialPortOptions;
 
 // The current status of the daemon
 enum class DaemonStatus {
@@ -54,9 +52,9 @@ private:
     asio::io_context io;
     asio::signal_set signals{io, SIGINT, SIGTERM};
     GPS gps;
-    std::unique_ptr<daemon::GPSSerialPort> gpsSerialPort;
-    std::unique_ptr<daemon::RotatorSerialPort> rotatorSerialPort;
-    std::unique_ptr<daemon::RadioSerialPort> radioSerialPort;
+    std::unique_ptr<GPSSerialPort> gpsSerialPort;
+    std::unique_ptr<RotatorSerialPort> rotatorSerialPort;
+    std::unique_ptr<RadioSerialPort> radioSerialPort;
 
     void eventLoop();
 };

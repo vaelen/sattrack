@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include <sattrack/daemon/serialport.hpp>
+#include <sattrack/serialport.hpp>
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/chrono.h>
 
@@ -12,7 +12,7 @@ using spdlog::info;
 using spdlog::warn;
 using spdlog::error;
 
-namespace sattrack::daemon {
+namespace sattrack {
 
 using asio::error_code;
 
@@ -221,4 +221,4 @@ void GPSSerialPort::processOutput(std::string &data) {
 
 }
 
-} // namespace sattrack::daemon
+} // namespace sattrack

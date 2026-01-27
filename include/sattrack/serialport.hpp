@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef __SATTRACK_DAEMON_SERIALPORT_HPP
-#define __SATTRACK_DAEMON_SERIALPORT_HPP
+#ifndef __SATTRACK_SERIALPORT_HPP
+#define __SATTRACK_SERIALPORT_HPP
 
 #include <string>
 #include <asio.hpp>
 #include <sattrack/gps.hpp>
 
-namespace sattrack::daemon {
+namespace sattrack {
 
 constexpr double GPS_CHANGE_THRESHOLD_DEGREES = 0.0001;
 constexpr double GPS_CHANGE_THRESHOLD_KM = 0.001;
@@ -60,7 +60,7 @@ public:
 
     GPSSerialPort(asio::io_context& io, const std::string& name, const std::string& device, const SerialPortOptions& options, GPS& gps)
         : SerialPort(io, name, device, options), gps(gps) {};
-    
+
     virtual ~GPSSerialPort() = default;
 
     void processOutput(std::string &data) override;
@@ -73,7 +73,7 @@ class RotatorSerialPort : public SerialPort {
 public:
     RotatorSerialPort(asio::io_context& io, const std::string& name, const std::string& device, const SerialPortOptions& options)
         : SerialPort(io, name, device, options) {};
-    
+
     virtual ~RotatorSerialPort() = default;
 
 };
@@ -82,11 +82,11 @@ class RadioSerialPort : public SerialPort {
 public:
     RadioSerialPort(asio::io_context& io, const std::string& name, const std::string& device, const SerialPortOptions& options)
         : SerialPort(io, name, device, options) {};
-    
+
     virtual ~RadioSerialPort() = default;
 
 };
 
-} // namespace sattrack::daemon
+} // namespace sattrack
 
 #endif

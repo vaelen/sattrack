@@ -45,18 +45,18 @@ void Daemon::start() {
 
     SerialPortOptions gpsPortOptions;
     gpsPortOptions.readTerminator = "\r\n";
-    gpsSerialPort = std::make_unique<daemon::GPSSerialPort>(io, "GPS", "/dev/ttyS1", gpsPortOptions, gps);
+    gpsSerialPort = std::make_unique<GPSSerialPort>(io, "GPS", "/dev/ttyS1", gpsPortOptions, gps);
     gpsSerialPort->start();
 
     SerialPortOptions rotatorPortOptions;
     rotatorPortOptions.readTerminator = "\r\n";
-    rotatorSerialPort = std::make_unique<daemon::RotatorSerialPort>(io, "Rotator", "/dev/ttyS2", rotatorPortOptions);
+    rotatorSerialPort = std::make_unique<RotatorSerialPort>(io, "Rotator", "/dev/ttyS2", rotatorPortOptions);
     rotatorSerialPort->start();
 
     SerialPortOptions radioPortOptions;
     radioPortOptions.readTerminator = "\r\n";
     radioPortOptions.baudRate = 38400;
-    radioSerialPort = std::make_unique<daemon::RadioSerialPort>(io, "Radio", "/dev/ttyS4", radioPortOptions);
+    radioSerialPort = std::make_unique<RadioSerialPort>(io, "Radio", "/dev/ttyS4", radioPortOptions);
     radioSerialPort->start();
 
     ioThread = std::thread([this]{ io.run(); });
