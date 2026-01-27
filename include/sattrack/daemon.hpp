@@ -55,8 +55,8 @@ private:
     asio::signal_set signals{io, SIGINT, SIGTERM};
     GPS gps;
     std::unique_ptr<daemon::GPSSerialPort> gpsSerialPort;
-    std::unique_ptr<daemon::SerialPort> rotatorSerialPort;
-    std::unique_ptr<daemon::SerialPort> radioSerialPort;
+    std::unique_ptr<daemon::RotatorSerialPort> rotatorSerialPort;
+    std::unique_ptr<daemon::RadioSerialPort> radioSerialPort;
 
     void eventLoop();
 };

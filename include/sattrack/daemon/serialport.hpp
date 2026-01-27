@@ -69,6 +69,24 @@ protected:
     GPS&gps;
 };
 
-}
+class RotatorSerialPort : public SerialPort {
+public:
+    RotatorSerialPort(asio::io_context& io, const std::string& name, const std::string& device, const SerialPortOptions& options)
+        : SerialPort(io, name, device, options) {};
+    
+    virtual ~RotatorSerialPort() = default;
+
+};
+
+class RadioSerialPort : public SerialPort {
+public:
+    RadioSerialPort(asio::io_context& io, const std::string& name, const std::string& device, const SerialPortOptions& options)
+        : SerialPort(io, name, device, options) {};
+    
+    virtual ~RadioSerialPort() = default;
+
+};
+
+} // namespace sattrack::daemon
 
 #endif
