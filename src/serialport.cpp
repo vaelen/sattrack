@@ -6,6 +6,8 @@
 #include <sattrack/serialport.hpp>
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/chrono.h>
+#include <chrono>
+#include <asio.hpp>
 
 using spdlog::debug;
 using spdlog::info;
@@ -83,6 +85,7 @@ void SerialPort::start() {
     info("{} serial port initialized.", name_);
 
     readNextPacket();
+    started();
 }
 
 void SerialPort::readNextPacket() {
@@ -163,6 +166,7 @@ void SerialPort::sendCommand(const std::string& command) {
     if (!port_.is_open()) {
         throw std::runtime_error("Serial port not open: " + name_);
     }
+    debug("Sending command on {} serial port: {}", name_, command);
     asio::async_write(port_, asio::buffer(command),
         [this](const error_code& ec, std::size_t /*bytes_transferred*/) {
             if (ec) {
@@ -174,15 +178,13 @@ void SerialPort::sendCommand(const std::string& command) {
 ///// GPSerialPort Implementation /////
 
 void GPSSerialPort::processOutput(std::string &data) {
-    debug("GPS received data: {}", data);
+    auto oldPosition = gps_.getPosition();
+    auto oldTime = gps_.getUTCTime();
 
-    auto oldPosition = gps.getPosition();
-    auto oldTime = gps.getUTCTime();
+    gps_.update(data);
 
-    gps.update(data);
-
-    auto newPosition = gps.getPosition();
-    auto newTime = gps.getUTCTime();
+    auto newPosition = gps_.getPosition();
+    auto newTime = gps_.getUTCTime();
 
     if (newPosition.has_value()) {
         bool positionChanged = false;
@@ -220,5 +222,42 @@ void GPSSerialPort::processOutput(std::string &data) {
     }
 
 }
+
+///// RotatorSerialPort Implementation /////
+
+RotatorSerialPort::RotatorSerialPort(asio::io_context& io, const std::string& name, const std::string& device, const SerialPortOptions& options, Rotator& rotator)
+    : SerialPort(io, name, device, options), rotator_(rotator), statusCommandTimer_(io) {
+}
+
+void RotatorSerialPort::started() {
+    scheduleStatusCommandPoll();
+}
+
+void RotatorSerialPort::scheduleStatusCommandPoll() {
+    statusCommandTimer_.expires_after(statusCommandInterval_);
+    statusCommandTimer_.async_wait([this](const error_code& ec) {
+        if (!ec && port_.is_open()) {
+            sendCommand(rotator_.getStatusCommand());
+            scheduleStatusCommandPoll();
+        }
+    });
+}
+
+void RotatorSerialPort::processOutput(std::string &data) {
+    debug("Rotator received data: {}", data);
+
+    auto oldAz = rotator_.getAzimuth();
+    auto oldEl = rotator_.getElevation();
+
+    rotator_.update(data);
+
+    auto newAz = rotator_.getAzimuth();
+    auto newEl = rotator_.getElevation();
+
+    if (oldAz != newAz || oldEl != newEl) {
+        info("Rotator Position Updated: Az {:.2f}°, El {:.2f}°", newAz.value_or(0.0), newEl.value_or(0.0));
+    }
+}
+
 
 } // namespace sattrack

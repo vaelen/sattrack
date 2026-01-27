@@ -185,6 +185,7 @@ set(SOURCES
     src/gps.cpp
     src/daemon.cpp
     src/serialport.cpp
+    src/rotator.cpp
 )
 
 # =============================================================================

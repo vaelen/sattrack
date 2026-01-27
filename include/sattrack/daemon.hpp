@@ -14,6 +14,8 @@
 #include <condition_variable>
 #include <asio.hpp>
 #include <sattrack/serialport.hpp>
+#include <sattrack/gps.hpp>
+#include <sattrack/rotator.hpp>
 
 namespace sattrack {
 
@@ -52,6 +54,7 @@ private:
     asio::io_context io;
     asio::signal_set signals{io, SIGINT, SIGTERM};
     GPS gps;
+    Rotator rotator;
     std::unique_ptr<GPSSerialPort> gpsSerialPort;
     std::unique_ptr<RotatorSerialPort> rotatorSerialPort;
     std::unique_ptr<RadioSerialPort> radioSerialPort;

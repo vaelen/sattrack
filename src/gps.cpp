@@ -11,12 +11,16 @@
 #include <date/date.h>
 
 using spdlog::debug;
+using spdlog::info;
+using spdlog::warn;
+using spdlog::error;
 
 namespace sattrack {
 
 // === Public methods ===
 
 bool GPS::update(std::string_view sentence) {
+
     // Remove leading $ if present
     if (!sentence.empty() && sentence[0] == '$') {
         sentence.remove_prefix(1);

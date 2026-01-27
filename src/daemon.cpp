@@ -50,7 +50,7 @@ void Daemon::start() {
 
     SerialPortOptions rotatorPortOptions;
     rotatorPortOptions.readTerminator = "\r\n";
-    rotatorSerialPort = std::make_unique<RotatorSerialPort>(io, "Rotator", "/dev/ttyS2", rotatorPortOptions);
+    rotatorSerialPort = std::make_unique<RotatorSerialPort>(io, "Rotator", "/dev/ttyS2", rotatorPortOptions, rotator);
     rotatorSerialPort->start();
 
     SerialPortOptions radioPortOptions;
