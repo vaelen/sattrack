@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 
-project(SatTrack VERSION 1.0.0 LANGUAGES CXX)
+project(SatTrack VERSION 1.0.0 LANGUAGES CXX C)
 
 # =============================================================================
 # Cross-compilation options
@@ -63,6 +63,20 @@ FetchContent_MakeAvailable(asio)
 add_library(asio INTERFACE)
 target_include_directories(asio INTERFACE ${asio_SOURCE_DIR}/asio/include)
 target_compile_definitions(asio INTERFACE ASIO_STANDALONE)
+
+# i2clcd - LCD display control via I2C (Makefile project, compile manually)
+FetchContent_Declare(
+    i2clcd
+    GIT_REPOSITORY https://github.com/vaelen/i2clcd.git
+    GIT_TAG        main
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(i2clcd)
+add_library(i2clcd STATIC ${i2clcd_SOURCE_DIR}/src/i2clcd.c)
+target_include_directories(i2clcd PUBLIC
+    ${i2clcd_SOURCE_DIR}/include
+    ${i2clcd_SOURCE_DIR}/src
+)
 
 # spdlog - use FetchContent for static linking, system package otherwise
 if(SATTRACK_STATIC_LINK)
@@ -186,6 +200,7 @@ set(SOURCES
     src/daemon.cpp
     src/serialport.cpp
     src/rotator.cpp
+    src/lcd.cpp
 )
 
 # =============================================================================
@@ -202,6 +217,7 @@ if(SATTRACK_STATIC_LINK)
         spdlog::spdlog
         asio
         CLI11::CLI11
+        i2clcd
     )
 else()
     target_link_libraries(sattrack
@@ -211,6 +227,7 @@ else()
         fmt::fmt
         asio
         CLI11::CLI11
+        i2clcd
     )
 endif()
 
@@ -265,4 +282,5 @@ else()
     message(STATUS "  fmt: ${fmt_VERSION}")
 endif()
 message(STATUS "  Asio: FetchContent (v1.30.2)")
+message(STATUS "  i2clcd: FetchContent (main)")
 message(STATUS "")

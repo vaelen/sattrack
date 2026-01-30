@@ -5,6 +5,8 @@
 
 #include <sattrack/daemon.hpp>
 #include <spdlog/spdlog.h>
+#include <chrono>
+#include <spdlog/fmt/chrono.h>
 
 using spdlog::debug;
 using spdlog::info;
@@ -39,25 +41,35 @@ void Daemon::start() {
     info("Starting daemon...");
     eventLoopThread = std::thread([this]{ eventLoop(); });
 
+    initLCD();
+
     initSignals();
 
     // TODO: Add serial port configuration options
 
     SerialPortOptions gpsPortOptions;
     gpsPortOptions.readTerminator = "\r\n";
-    gpsSerialPort = std::make_unique<GPSSerialPort>(io, "GPS", "/dev/ttyS1", gpsPortOptions, gps);
+    gpsPortOptions.baudRate = config.getGPSBaudRate();
+    gpsSerialPort = std::make_unique<GPSSerialPort>(io, "GPS", config.getGPSSerialPort(), gpsPortOptions, gps);
     gpsSerialPort->start();
 
     SerialPortOptions rotatorPortOptions;
     rotatorPortOptions.readTerminator = "\r\n";
-    rotatorSerialPort = std::make_unique<RotatorSerialPort>(io, "Rotator", "/dev/ttyS2", rotatorPortOptions, rotator);
+    rotatorPortOptions.baudRate = config.getRotatorBaudRate();
+    rotatorSerialPort = std::make_unique<RotatorSerialPort>(io, "Rotator", config.getRotatorSerialPort(), rotatorPortOptions, rotator);
     rotatorSerialPort->start();
 
     SerialPortOptions radioPortOptions;
     radioPortOptions.readTerminator = "\r\n";
-    radioPortOptions.baudRate = 38400;
-    radioSerialPort = std::make_unique<RadioSerialPort>(io, "Radio", "/dev/ttyS4", radioPortOptions);
+    radioPortOptions.baudRate = config.getRadioBaudRate();
+    radioSerialPort = std::make_unique<RadioSerialPort>(io, "Radio", config.getRadioSerialPort(), radioPortOptions);
     radioSerialPort->start();
+
+    statusTimer = std::make_unique<asio::steady_timer>(io);
+    scheduleStatusTimer();
+
+    lcdTimer = std::make_unique<asio::steady_timer>(io);
+    scheduleLCDUpdate();
 
     ioThread = std::thread([this]{ io.run(); });
 }
@@ -70,6 +82,99 @@ void Daemon::initSignals() {
             info("Received signal {}.", sig);
         }
         stop(); 
+    });
+}
+
+void Daemon::initLCD() {
+    try {
+        lcd.setBus(config.getLCDI2CBus());
+        lcd.setAddress(config.getLCDI2CAddress());
+        lcd.init();
+        lcd.clear();
+        lcd.setLine(0, "   Groundstation");
+        lcd.setLine(1, "    Starting...");   
+    } catch (const std::exception& e) {
+        error("Failed to initialize LCD: {}", e.what());
+    }
+}
+
+void Daemon::scheduleLCDUpdate() {
+    lcdTimer->expires_after(std::chrono::seconds(5));
+    lcdTimer->async_wait([this](const asio::error_code& ec) {
+        if (!ec) {
+            try {
+                lcd.clear();
+                auto gpsTime = gps.getUTCTime();
+                if (gpsTime.has_value()) {
+                    lcd.setCursor(0, 0);
+                    lcd.print("{}", *gpsTime);
+                } else {
+                    lcd.setCursor(0, 0);
+                    lcd.print("");
+                }
+                auto gpsPos = gps.getPosition();
+                if (gpsPos.has_value()) {
+                    lcd.setCursor(0, 1);
+                    lcd.print("{:.4f} {:.4f}", 
+                        gpsPos->latInRadians * RADIANS_TO_DEGREES, 
+                        gpsPos->lonInRadians * RADIANS_TO_DEGREES);
+                } else {
+                    lcd.setCursor(0, 1);
+                    lcd.print("No GPS Fix");
+                }
+                auto rotAz = rotator.getAzimuth();
+                auto rotEl = rotator.getElevation();
+                if (rotAz.has_value() && rotEl.has_value()) {
+                    lcd.setCursor(0, 2);
+                    lcd.print("Az: {:.1f} El: {:.1f}", rotAz.value(), rotEl.value());
+                } else {
+                    lcd.setCursor(0, 2);
+                    lcd.print("Looking for Rotator");
+                }
+                lcd.setCursor(0, 3);
+                lcd.print("     Waiting...");
+            } catch (const std::exception& e) {
+                error("Failed to update LCD: {}", e.what());
+            }
+            scheduleLCDUpdate(); // Reschedule the timer
+        } else {
+            error("LCD update timer error: {}", ec.message());
+        }
+    });
+}
+
+void Daemon::scheduleStatusTimer() {
+    statusTimer->expires_after(std::chrono::seconds(config.getStatusIntervalSeconds()));
+    statusTimer->async_wait([this](const asio::error_code& ec) {
+        if (!ec) {
+            info("--- Groundstation Status ---");
+            auto gpsPos = gps.getPosition();
+            if (gpsPos.has_value()) {
+                info("- GPS Position: Lat {:.6f}°, Lon {:.6f}°, Alt {:.2f} km",
+                     gpsPos->latInRadians * RADIANS_TO_DEGREES,
+                     gpsPos->lonInRadians * RADIANS_TO_DEGREES,
+                     gpsPos->altInKilometers);
+            } else {
+                info("- GPS Position: No fix");
+            }
+            auto gpsTime = gps.getUTCTime();
+            if (gpsTime.has_value()) {
+                info("- GPS Time: {}", gpsTime.value());
+            } else {
+                info("- GPS Time: Unknown");
+            }
+            auto rotAz = rotator.getAzimuth();
+            auto rotEl = rotator.getElevation();
+            if (rotAz.has_value() && rotEl.has_value()) {
+                info("- Rotator Position: Az {:.2f}°, El {:.2f}°", rotAz.value(), rotEl.value());
+            } else {
+                info("- Rotator Position: Unknown");
+            }
+            info("----------------------------");
+            scheduleStatusTimer(); // Reschedule the timer
+        } else {
+            error("Status logging timer error: {}", ec.message());
+        }
     });
 }
 
@@ -126,7 +231,9 @@ void Daemon::eventLoop() {
     // Update status to STOPPED when exiting loop
     _status.store(DaemonStatus::STOPPED);
     info("Daemon stopped.");
-    
+    lcd.clear();
+    lcd.setLine(0, "   Groundstation");
+    lcd.setLine(1, "      Offline");   
 }
 
 void Daemon::wait() {

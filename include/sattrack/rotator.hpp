@@ -68,6 +68,14 @@ public:
      */
     std::string getStatusCommand() const;
 
+    /**
+     * Get the command string to move the rotator to specified azimuth and elevation.
+     * @param azimuthDeg Target azimuth in degrees
+     * @param elevationDeg Target elevation in degrees
+     * @return Move command string
+     */
+    std::string getMoveCommand(double azimuthDeg, double elevationDeg) const;
+
 private:
     mutable std::mutex mutex_;
     std::optional<double> azimuth_;

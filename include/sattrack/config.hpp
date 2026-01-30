@@ -15,6 +15,16 @@ namespace sattrack {
 
 using time_point = std::chrono::system_clock::time_point;
 
+constexpr const char* DEFAULT_GPS_SERIAL_PORT      = "/dev/ttyS1";
+constexpr int         DEFAULT_GPS_BAUD_RATE        = 9600;
+constexpr const char* DEFAULT_ROTATOR_SERIAL_PORT  = "/dev/ttyS2";
+constexpr int         DEFAULT_ROTATOR_BAUD_RATE    = 9600;
+constexpr const char* DEFAULT_RADIO_SERIAL_PORT    = "/dev/ttyS4";
+constexpr int         DEFAULT_RADIO_BAUD_RATE      = 38400;
+constexpr int         DEFAULT_STATUS_INTERVAL_SECONDS = 300; // 5 minutes
+constexpr int         DEFAULT_LCD_I2C_BUS            = 1;
+constexpr int         DEFAULT_LCD_I2C_ADDRESS        = 0x27;
+
 class Config {
 public:
     // Empty constructor
@@ -68,22 +78,34 @@ public:
     int getRadioBaudRate();
     void setRadioBaudRate(int baudRate);
 
+    int getStatusIntervalSeconds();
+    void setStatusIntervalSeconds(int seconds);
+
+    int getLCDI2CBus();
+    void setLCDI2CBus(int bus);
+
+    int getLCDI2CAddress();
+    void setLCDI2CAddress(int address);
+    
 private:
     std::optional<std::string> apiKey;
-    double longitude;
-    double latitude;
-    double altitude;
-    int days;
-    int minimumElevation;
-    bool verbose;
+    double longitude = 0.0;
+    double latitude = 0.0;
+    double altitude = 0.0;
+    int days = 0;
+    int minimumElevation = 0;
+    bool verbose = false;
     time_point time;
-    int horizon;
-    std::string gpsSerialPort;
-    int gpsBaudRate;
-    std::string rotatorSerialPort;
-    int rotatorBaudRate;
-    std::string radioSerialPort;
-    int radioBaudRate;
+    int horizon = 0;
+    std::string gpsSerialPort = DEFAULT_GPS_SERIAL_PORT;
+    int gpsBaudRate = DEFAULT_GPS_BAUD_RATE;
+    std::string rotatorSerialPort = DEFAULT_ROTATOR_SERIAL_PORT;
+    int rotatorBaudRate = DEFAULT_ROTATOR_BAUD_RATE;
+    std::string radioSerialPort = DEFAULT_RADIO_SERIAL_PORT;
+    int radioBaudRate = DEFAULT_RADIO_BAUD_RATE;
+    int statusIntervalSeconds = DEFAULT_STATUS_INTERVAL_SECONDS;
+    int lcdI2CBus = DEFAULT_LCD_I2C_BUS;
+    int lcdI2CAddress = DEFAULT_LCD_I2C_ADDRESS;
 };
 
 }

@@ -171,4 +171,28 @@ void Config::setRadioBaudRate(int baudRate) {
     radioBaudRate = baudRate;
 }
 
+int Config::getStatusIntervalSeconds() {
+    return statusIntervalSeconds;
 }
+
+void Config::setStatusIntervalSeconds(int seconds) {
+    statusIntervalSeconds = seconds;
+}
+
+int Config::getLCDI2CBus() {
+    return lcdI2CBus;
+}
+
+void Config::setLCDI2CBus(int bus) {
+    lcdI2CBus = bus;
+}
+
+int Config::getLCDI2CAddress() {
+    return lcdI2CAddress;
+}
+
+void Config::setLCDI2CAddress(int address) {
+    lcdI2CAddress = address;
+}
+
+} // namespace sattrack

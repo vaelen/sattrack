@@ -16,6 +16,8 @@
 #include <sattrack/serialport.hpp>
 #include <sattrack/gps.hpp>
 #include <sattrack/rotator.hpp>
+#include <sattrack/config.hpp>
+#include <sattrack/lcd.hpp>
 
 namespace sattrack {
 
@@ -34,17 +36,21 @@ enum class DaemonEvent {
 
 class Daemon {
 public:
-    Daemon() = default;
+    Daemon(Config config) : config(std::move(config)) {}
     ~Daemon();
 
     DaemonStatus status();
     void start();
     void initSignals();
+    void initLCD();
+    void scheduleLCDUpdate();
+    void scheduleStatusTimer();
     void stop();
     void send(DaemonEvent event);
     void wait();
 
 private:
+    Config config;
     std::atomic<DaemonStatus> _status = DaemonStatus::STOPPED;
     std::thread eventLoopThread;
     std::mutex eventMutex;
@@ -58,7 +64,9 @@ private:
     std::unique_ptr<GPSSerialPort> gpsSerialPort;
     std::unique_ptr<RotatorSerialPort> rotatorSerialPort;
     std::unique_ptr<RadioSerialPort> radioSerialPort;
-
+    std::unique_ptr<asio::steady_timer> statusTimer;
+    LCD lcd;
+    std::unique_ptr<asio::steady_timer> lcdTimer;
     void eventLoop();
 };
 

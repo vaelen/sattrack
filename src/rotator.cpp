@@ -76,4 +76,10 @@ std::string Rotator::getStatusCommand() const {
  return "C2\r\n";
 }
 
+std::string Rotator::getMoveCommand(double azimuthDeg, double elevationDeg) const {
+    char command[32];
+    snprintf(command, sizeof(command), "M %03.0f %03.0f\r\n", azimuthDeg, elevationDeg);
+    return std::string(command);
+}
+
 } // namespace sattrack

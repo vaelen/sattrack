@@ -571,10 +571,31 @@ int main(int argc, char* argv[]) {
         "Serial port device path for Rotator controller (default: /dev/ttyS4)"
     );
 
+    daemonCommand->add_option_function<int>("--status-interval",
+        [&config](int seconds) {
+            config.setStatusIntervalSeconds(seconds);
+        },
+        "Interval in seconds for status updates (default: 300)"
+    );
+
+    daemonCommand->add_option_function<int>("--lcd-i2c-bus",
+        [&config](int bus) {
+            config.setLCDI2CBus(bus);
+        },
+        "I2C bus number for LCD display (default: 1)"
+    );
+
+    daemonCommand->add_option_function<int>("--lcd-i2c-address",
+        [&config](int address) {
+            config.setLCDI2CAddress(address);
+        },
+        "I2C address for LCD display (default: 0x27)"
+    );
+
     daemonCommand->final_callback([&config](void) {
         try {
             spdlog::set_level(config.getVerbose() ? spdlog::level::debug : spdlog::level::info);
-            sattrack::Daemon daemon;
+            sattrack::Daemon daemon(config);
             daemon.start();
             daemon.wait();
         } catch (const std::exception &err) {

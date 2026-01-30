@@ -257,6 +257,11 @@ void RotatorSerialPort::processOutput(std::string &data) {
     if (oldAz != newAz || oldEl != newEl) {
         info("Rotator Position Updated: Az {:.2f}°, El {:.2f}°", newAz.value_or(0.0), newEl.value_or(0.0));
     }
+
+    if (!oldAz.has_value() && newAz.has_value()) {
+        info("Parking Rotator");
+        sendCommand(rotator_.getMoveCommand(0.0, 90.0));
+    }
 }
 
 
